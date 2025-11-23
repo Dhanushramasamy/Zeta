@@ -11,6 +11,7 @@ interface SuggestedAction {
     title?: string;
     description?: string;
     reasoning: string;
+    project?: string;
     issueDetails?: {
         title: string;
         state: { name: string };
@@ -244,7 +245,13 @@ export default function LinearPage() {
                                                 {action.issueIdentifier && (
                                                     <span className="text-sm font-mono text-cyan-400 font-bold">{action.issueIdentifier}</span>
                                                 )}
-                                                {action.issueDetails?.project && (
+                                                {action.project && (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-1">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                                                        {action.project}
+                                                    </span>
+                                                )}
+                                                {action.issueDetails?.project && !action.project && (
                                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-gray-300">
                                                         {action.issueDetails.project.name}
                                                     </span>

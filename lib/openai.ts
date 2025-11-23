@@ -10,54 +10,73 @@ export interface SuggestedAction {
     title?: string; // Required for create_issue
     description?: string; // For comment body or issue description
     reasoning: string;
+    project?: string; // Inferred project name
 }
 
 export async function analyzeNotes(notes: string, activeIssues: import('./linear').LinearIssue[], users: import('./linear').LinearUser[] = []): Promise<SuggestedAction[]> {
     const issuesContext = activeIssues
         .map((i) => {
             const comments = i.comments?.map(c => `    - ${c.user?.name}: ${c.body}`).join('\n') || '';
-            return `${i.identifier}: ${i.title} (Status: ${i.state.name})\n  Comments:\n${comments}`;
+            return `[${i.identifier}] ${i.title}
+  Status: ${i.state.name}
+  Project: ${i.project?.name || 'None'}
+  Priority: ${i.priorityLabel || 'None'}
+  Comments:
+${comments}`;
         })
         .join('\n\n');
 
     const usersContext = users.map(u => `${u.name} (@${u.displayName})`).join(', ');
 
     const prompt = `
-You are a helpful assistant that analyzes daily work notes and suggests updates for Linear issues.
+You are a highly intelligent work assistant for Linear. Your goal is to analyze unstructured daily notes and convert them into structured, actionable Linear updates.
 
-Current Active Issues for the user (with recent comments):
+**Context:**
+- **Active Issues:**
 ${issuesContext}
 
-Available Users for tagging:
+- **Team Members:**
 ${usersContext}
 
-User's Daily Notes:
+**User's Notes:**
 ${notes}
 
-Based on the notes, suggest actions to take on Linear.
-- If the user mentions working on an existing issue, suggest posting a comment.
-- If the user mentions a new task that doesn't match an existing issue, suggest creating a new issue.
-- If the user says they finished an issue, suggest updating the status.
-- **Context Awareness**: Read the recent comments to ensure your new comment adds value and doesn't repeat things.
-- **Tagging**: If the user mentions a name (e.g. "Alice"), try to tag them using their Linear handle if available (e.g. "@alice").
-- **Detailed Creation**: When creating a new issue, use all available details to write a comprehensive description.
+**Instructions:**
+Analyze the notes and extract actions.
+1. **Match Existing Issues:** If the note refers to an existing issue (by ID or fuzzy title match), suggest a **comment** or **status update**.
+   - *Crucial:* Check the "Active Issues" list carefully. If a note says "Fixed login bug", look for an issue like "Login page error" and use its ID.
+2. **Create New Issues:** If the note describes a new task not in the list, suggest **creating a new issue**.
+   - Infer the **Project** if possible based on the context or similar issues.
+   - Write a clear, professional **Title** and **Description**.
+3. **Smart Context:**
+   - If the user mentions a name, tag them (e.g., "@alice").
+   - If the user implies a status change (e.g., "done with...", "started..."), suggest a status update.
 
-Return a JSON object with a key "actions" which is an array of objects.
-Each object should have:
-- type: "comment" | "create_issue" | "update_status"
-- issueIdentifier: string (e.g. "LIN-123") - ONLY for "comment"
-- title: string - ONLY for "create_issue"
-- description: string - The content of the comment or the description of the new issue.
-- reasoning: string - Brief explanation of why this action is suggested.
+**Output Format:**
+Return a JSON object with an "actions" array. Each action object must have:
+- \`type\`: "comment" | "create_issue" | "update_status"
+- \`issueIdentifier\`: string (Required for comment/update. Use the exact ID from the context, e.g., "LIN-123")
+- \`title\`: string (Required for create_issue)
+- \`description\`: string (The comment body or new issue description)
+- \`reasoning\`: string (Why you chose this action and issue)
+- \`project\`: string (Optional: The name of the project this belongs to, inferred from context)
 
-Example JSON:
+**Example JSON:**
 {
   "actions": [
     {
       "type": "comment",
       "issueIdentifier": "LIN-123",
-      "description": "Fixed the login bug. @alice please review.",
-      "reasoning": "User mentioned fixing login bug and asked Alice to review."
+      "description": "Fixed the validation logic. @alice can you verify?",
+      "reasoning": "Matched 'validation fix' to LIN-123. User asked for verification.",
+      "project": "Auth System"
+    },
+    {
+      "type": "create_issue",
+      "title": "Update Landing Page Hero",
+      "description": "Change the hero image to the new assets provided by design.",
+      "reasoning": "New task mentioned in notes.",
+      "project": "Website Redesign"
     }
   ]
 }
