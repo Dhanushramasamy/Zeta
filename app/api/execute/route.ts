@@ -26,7 +26,10 @@ export async function POST(request: Request) {
                     await createComment(issue.id, action.description || action.reasoning);
                     results.push({ status: 'success', action });
                 } else if (action.type === 'create_issue') {
-                    await createIssue(action.title, action.description);
+                    await createIssue({
+                        title: action.title,
+                        description: action.description
+                    });
                     results.push({ status: 'success', action });
                 }
             } catch (e) {
