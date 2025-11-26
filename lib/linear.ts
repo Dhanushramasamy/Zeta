@@ -148,16 +148,25 @@ export async function getUsers(): Promise<LinearUser[]> {
 }
 
 export async function getProjects(): Promise<LinearProject[]> {
-    const projects = await linearClient.projects();
-    // Filter for active projects (not archived/canceled)
-    return projects.nodes
-        .filter(p => p.state !== 'canceled' && p.state !== 'completed')
-        .map(p => ({
-            id: p.id,
-            name: p.name,
-            description: p.description,
-            state: p.state,
-        }));
+    // Fetch from Supabase
+    const { data: projects, error } = await supabase
+        .from('linear_projects')
+        .select('id, name, description, state')
+        .neq('state', 'canceled')
+        .neq('state', 'completed')
+        .order('name');
+
+    if (error) {
+        console.error('Error fetching projects from Supabase:', error);
+        return [];
+    }
+
+    return projects.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        state: p.state,
+    }));
 }
 
 export async function createComment(issueId: string, body: string) {
@@ -168,6 +177,11 @@ export async function createComment(issueId: string, body: string) {
 }
 
 export async function getTeams() {
+    // Note: We are currently syncing "Projects" as the main organizational unit for the AI.
+    // If you need actual "Teams" from Linear (which are different from Projects), you might need a separate sync.
+    // For now, I will keep this as fetching from SDK or we can map it to Projects if that's the intent.
+    // Given the previous context, "Projects" seem to be the focus.
+    // Let's keep getTeams as SDK for now unless we sync teams too.
     const teams = await linearClient.teams();
     return teams.nodes.map(t => ({
         id: t.id,
@@ -177,8 +191,18 @@ export async function getTeams() {
 }
 
 export async function getLabels() {
-    const labels = await linearClient.issueLabels();
-    return labels.nodes.map(l => ({
+    // Fetch from Supabase
+    const { data: labels, error } = await supabase
+        .from('linear_labels')
+        .select('id, name, color')
+        .order('name');
+
+    if (error) {
+        console.error('Error fetching labels from Supabase:', error);
+        return [];
+    }
+
+    return labels.map((l: any) => ({
         id: l.id,
         name: l.name,
         color: l.color
