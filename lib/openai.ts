@@ -13,7 +13,7 @@ export interface SuggestedAction {
     project?: string; // Inferred project name
 }
 
-export async function analyzeNotes(notes: string, activeIssues: import('./linear').LinearIssue[], users: import('./linear').LinearUser[] = []): Promise<SuggestedAction[]> {
+export async function analyzeNotes(notes: string, activeIssues: import('./linear').LinearIssue[], users: import('./linear').LinearUser[] = [], projectName?: string): Promise<SuggestedAction[]> {
     const issuesContext = activeIssues
         .map((i) => {
             const comments = i.comments?.map(c => `    - ${c.user?.name}: ${c.body}`).join('\n') || '';
@@ -28,6 +28,10 @@ ${comments}`;
 
     const usersContext = users.map(u => `${u.name} (@${u.displayName})`).join(', ');
 
+    const projectContextNote = projectName
+        ? `\n**IMPORTANT:** The user has selected the project "${projectName}". Focus your analysis ONLY on issues related to this project. When creating new issues, assign them to this project.`
+        : '';
+
     const prompt = `
 You are a highly intelligent work assistant for Linear. Your goal is to analyze unstructured daily notes and convert them into structured, actionable Linear updates.
 
@@ -37,6 +41,7 @@ ${issuesContext}
 
 - **Team Members:**
 ${usersContext}
+${projectContextNote}
 
 **User's Notes:**
 ${notes}

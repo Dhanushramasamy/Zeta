@@ -33,14 +33,27 @@ export interface LinearUser {
     displayName: string;
 }
 
-export async function getIssuesFromSupabase(): Promise<LinearIssue[]> {
-    const { data: issues, error } = await supabase
+export interface LinearProject {
+    id: string;
+    name: string;
+    description?: string;
+    state: string;
+}
+
+export async function getIssuesFromSupabase(projectName?: string): Promise<LinearIssue[]> {
+    let query = supabase
         .from('linear_issues')
         .select(`
             *,
             comments:linear_comments(body, user_name)
-        `)
-        .order('updated_at', { ascending: false });
+        `);
+
+    // Filter by project if provided
+    if (projectName) {
+        query = query.eq('project_name', projectName);
+    }
+
+    const { data: issues, error } = await query.order('updated_at', { ascending: false });
 
     if (error) {
         console.error('Error fetching from Supabase:', error);
@@ -134,6 +147,19 @@ export async function getUsers(): Promise<LinearUser[]> {
     }));
 }
 
+export async function getProjects(): Promise<LinearProject[]> {
+    const projects = await linearClient.projects();
+    // Filter for active projects (not archived/canceled)
+    return projects.nodes
+        .filter(p => p.state !== 'canceled' && p.state !== 'completed')
+        .map(p => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            state: p.state,
+        }));
+}
+
 export async function createComment(issueId: string, body: string) {
     return await linearClient.createComment({
         issueId,
@@ -141,8 +167,44 @@ export async function createComment(issueId: string, body: string) {
     });
 }
 
-export async function createIssue(title: string, description?: string, teamId?: string) {
-    // If no teamId provided, fetch the first team the user is in (simplified for now)
+export async function getTeams() {
+    const teams = await linearClient.teams();
+    return teams.nodes.map(t => ({
+        id: t.id,
+        name: t.name,
+        key: t.key
+    }));
+}
+
+export async function getLabels() {
+    const labels = await linearClient.issueLabels();
+    return labels.nodes.map(l => ({
+        id: l.id,
+        name: l.name,
+        color: l.color
+    }));
+}
+
+export interface CreateIssueParams {
+    title: string;
+    description?: string;
+    teamId?: string;
+    assigneeId?: string;
+    priority?: number;
+    labelIds?: string[];
+    dueDate?: string;
+}
+
+export async function createIssue({
+    title,
+    description,
+    teamId,
+    assigneeId,
+    priority,
+    labelIds,
+    dueDate
+}: CreateIssueParams) {
+    // If no teamId provided, fetch the first team the user is in
     let targetTeamId = teamId;
     if (!targetTeamId) {
         const me = await linearClient.viewer;
@@ -158,6 +220,10 @@ export async function createIssue(title: string, description?: string, teamId?: 
         teamId: targetTeamId,
         title,
         description,
+        assigneeId,
+        priority,
+        labelIds,
+        dueDate
     });
 }
 

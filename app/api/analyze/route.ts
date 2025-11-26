@@ -4,20 +4,20 @@ import { analyzeNotes } from '@/lib/openai';
 
 export async function POST(request: Request) {
     try {
-        const { notes } = await request.json();
+        const { notes, projectId } = await request.json();
 
         if (!notes) {
             return NextResponse.json({ error: 'Notes are required' }, { status: 400 });
         }
 
-        // 1. Fetch active issues from Supabase and Users
+        // 1. Fetch active issues from Supabase (filtered by project if provided) and Users
         const [issues, users] = await Promise.all([
-            getIssuesFromSupabase(),
+            getIssuesFromSupabase(projectId),
             getUsers()
         ]);
 
         // 2. Analyze notes with OpenAI
-        const suggestions = await analyzeNotes(notes, issues, users);
+        const suggestions = await analyzeNotes(notes, issues, users, projectId);
 
         // 3. Enrich suggestions with issue details
         const enrichedSuggestions = suggestions.map(suggestion => {

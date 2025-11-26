@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, CheckCircle, AlertCircle, RefreshCw, Edit2, X, Send, ChevronDown, ChevronUp, MessageSquare, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
@@ -42,6 +42,30 @@ export default function LinearPage() {
 
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
+    // Project selection state
+    const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+    const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+    const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+
+    // Fetch projects on mount
+    useEffect(() => {
+        const fetchProjects = async () => {
+            setIsLoadingProjects(true);
+            try {
+                const res = await fetch('/api/projects');
+                if (res.ok) {
+                    const data = await res.json();
+                    setProjects(data.projects || []);
+                }
+            } catch (err) {
+                console.error('Failed to fetch projects:', err);
+            } finally {
+                setIsLoadingProjects(false);
+            }
+        };
+        fetchProjects();
+    }, []);
+
     const handleAnalyze = async () => {
         setIsAnalyzing(true);
         setError(null);
@@ -52,7 +76,10 @@ export default function LinearPage() {
             const res = await fetch('/api/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes }),
+                body: JSON.stringify({
+                    notes,
+                    projectId: selectedProjectId || undefined
+                }),
             });
 
             if (!res.ok) throw new Error('Failed to analyze notes');
@@ -170,6 +197,32 @@ export default function LinearPage() {
                     </h1>
                     <p className="text-lg text-gray-400">Turn your daily notes into Linear updates automatically.</p>
                 </header>
+
+                {/* Project Selection */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6">
+                    <label htmlFor="project-select" className="block text-sm font-medium text-gray-300 mb-2">
+                        Select Project
+                    </label>
+                    <select
+                        id="project-select"
+                        value={selectedProjectId}
+                        onChange={(e) => setSelectedProjectId(e.target.value)}
+                        disabled={isLoadingProjects}
+                        className="w-full rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm p-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <option value="" className="bg-slate-900">All Projects</option>
+                        {projects.map((project) => (
+                            <option key={project.id} value={project.name} className="bg-slate-900">
+                                {project.name}
+                            </option>
+                        ))}
+                    </select>
+                    {selectedProjectId && (
+                        <p className="mt-2 text-xs text-cyan-400">
+                            🎯 Analysis will focus on: <span className="font-semibold">{selectedProjectId}</span>
+                        </p>
+                    )}
+                </div>
 
                 <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 space-y-4">
                     <label htmlFor="notes" className="block text-sm font-medium text-gray-300">
