@@ -48,9 +48,9 @@ export async function getIssuesFromSupabase(projectName?: string): Promise<Linea
             comments:linear_comments(body, user_name)
         `);
 
-    // Filter by project if provided
+    // Filter by project if provided (flexible matching)
     if (projectName) {
-        query = query.eq('project_name', projectName);
+        query = query.ilike('project_name', `%${projectName}%`);
     }
 
     const { data: issues, error } = await query.order('updated_at', { ascending: false });

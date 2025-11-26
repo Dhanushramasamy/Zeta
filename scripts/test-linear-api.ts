@@ -47,12 +47,12 @@ async function testLinearIntegration() {
         */
         console.log('\n📝 Skipping Issue Creation (Uncomment in script to run)');
 
-        // 5. Test Fetching Issues from Supabase
-        console.log('\n📥 Fetching Issues from Supabase...');
-        const issues = await getIssuesFromSupabase();
+        // 5. Test Fetching Issues from Supabase (Flexible Match)
+        console.log('\n📥 Fetching Issues from Supabase (Flexible Match: "hash")...');
+        const issues = await getIssuesFromSupabase("hash");
         console.log(`   ✅ Found ${issues.length} issues`);
         if (issues.length > 0) {
-            console.log(`   Example: ${issues[0].identifier} - ${issues[0].title}`);
+            console.log(`   Example: ${issues[0].identifier} - ${issues[0].title} (Project: ${issues[0].project?.name})`);
         }
 
     } catch (error) {
