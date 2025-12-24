@@ -54,10 +54,11 @@ interface WorkflowStatus {
 export default function Dashboard() {
     const [issues, setIssues] = useState<Issue[]>([]);
     const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+    const [workflowStates, setWorkflowStates] = useState<{ id: string; name: string; color: string }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [workflowModal, setWorkflowModal] = useState<'weekly' | 'daily' | null>(null);
-    const [activeStatuses, setActiveStatuses] = useState<WorkflowStatus[]>([]);
+    const [activeStatuses, setActiveStatuses] = useState<WorkflowStatus[]>();
 
     // New States for Filters and Dropdown
     const [activeDropdown, setActiveDropdown] = useState<'status' | 'project' | null>(null);
@@ -124,6 +125,19 @@ export default function Dashboard() {
             }
         };
         fetchProjects();
+    }, []);
+
+    useEffect(() => {
+        const fetchStates = async () => {
+            try {
+                const res = await fetch('/api/states');
+                const data = await res.json();
+                setWorkflowStates(data.states || []);
+            } catch (error) {
+                console.error('Failed to fetch workflow states:', error);
+            }
+        };
+        fetchStates();
     }, []);
 
     const filteredIssues = issues.filter(issue =>
@@ -203,7 +217,7 @@ export default function Dashboard() {
 
                             {/* Weekly Status Quick Access */}
                             <div className="flex gap-4">
-                                {activeStatuses.map((status) => (
+                                {(activeStatuses || []).map((status) => (
                                     <div key={status.client} className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group cursor-pointer">
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-2">
@@ -250,23 +264,31 @@ export default function Dashboard() {
                                     </button>
 
                                     {activeDropdown === 'status' && (
-                                        <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 p-2 z-30 animate-in fade-in zoom-in-95 duration-100">
-                                            {['Todo', 'In Progress', 'Triage', 'Backlog', 'Done'].map(status => (
-                                                <label key={status} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={filters.statuses.includes(status)}
-                                                        onChange={(e) => {
-                                                            const newStatuses = e.target.checked
-                                                                ? [...filters.statuses, status]
-                                                                : filters.statuses.filter(s => s !== status);
-                                                            setFilters(f => ({ ...f, statuses: newStatuses }));
-                                                        }}
-                                                        className="rounded border-gray-300 text-orange-500 focus:ring-orange-200"
-                                                    />
-                                                    <span className="text-sm font-medium text-gray-700">{status}</span>
-                                                </label>
-                                            ))}
+                                        <div className="absolute top-full left-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-gray-100 p-2 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-80 overflow-y-auto">
+                                            {workflowStates.length > 0 ? (
+                                                workflowStates.map(state => (
+                                                    <label key={state.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={filters.statuses.includes(state.name)}
+                                                            onChange={(e) => {
+                                                                const newStatuses = e.target.checked
+                                                                    ? [...filters.statuses, state.name]
+                                                                    : filters.statuses.filter(s => s !== state.name);
+                                                                setFilters(f => ({ ...f, statuses: newStatuses }));
+                                                            }}
+                                                            className="rounded border-gray-300 text-orange-500 focus:ring-orange-200"
+                                                        />
+                                                        <span
+                                                            className="w-2 h-2 rounded-full"
+                                                            style={{ backgroundColor: state.color }}
+                                                        />
+                                                        <span className="text-sm font-medium text-gray-700">{state.name}</span>
+                                                    </label>
+                                                ))
+                                            ) : (
+                                                <div className="p-2 text-sm text-gray-500">Loading states...</div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
