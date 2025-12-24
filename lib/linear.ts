@@ -217,6 +217,9 @@ export interface CreateIssueParams {
     priority?: number;
     labelIds?: string[];
     dueDate?: string;
+    parentId?: string; // For sub-issues
+    stateId?: string; // Initial state
+    projectId?: string;
 }
 
 export async function createIssue({
@@ -226,7 +229,10 @@ export async function createIssue({
     assigneeId,
     priority,
     labelIds,
-    dueDate
+    dueDate,
+    parentId,
+    stateId,
+    projectId
 }: CreateIssueParams) {
     // If no teamId provided, fetch the first team the user is in
     let targetTeamId = teamId;
@@ -240,7 +246,7 @@ export async function createIssue({
         }
     }
 
-    return await linearClient.createIssue({
+    const issuePayload: any = {
         teamId: targetTeamId,
         title,
         description,
@@ -248,7 +254,88 @@ export async function createIssue({
         priority,
         labelIds,
         dueDate
+    };
+
+    // Add parent for sub-issue
+    if (parentId) {
+        issuePayload.parentId = parentId;
+    }
+
+    // Add state if provided
+    if (stateId) {
+        issuePayload.stateId = stateId;
+    }
+
+    // Add project if provided
+    if (projectId) {
+        issuePayload.projectId = projectId;
+    }
+
+    return await linearClient.createIssue(issuePayload);
+}
+
+/**
+ * Create a sub-issue under a parent issue, automatically inheriting:
+ * - Team from parent
+ * - Assignee (defaults to current user/Dhanush)
+ * - Labels from parent
+ * - Project from parent
+ */
+export async function createSubIssue(
+    parentIdentifier: string,
+    title: string,
+    description: string,
+    initialState: 'Todo' | 'In Progress' | 'Backlog' = 'In Progress'
+) {
+    // Fetch the parent issue
+    const parent = await linearClient.issue(parentIdentifier);
+    if (!parent) {
+        throw new Error(`Parent issue not found: ${parentIdentifier}`);
+    }
+
+    // Get parent's team, project, labels, and assignee
+    const team = await parent.team;
+    const parentProject = await parent.project;
+    const parentLabels = await parent.labels();
+    const me = await linearClient.viewer;
+
+    // Resolve the state ID from name
+    let stateId: string | undefined;
+    if (team) {
+        const states = await team.states();
+        const matchingState = states.nodes.find(
+            (s: any) => s.name.toLowerCase() === initialState.toLowerCase()
+        );
+        if (matchingState) {
+            stateId = matchingState.id;
+        }
+    }
+
+    // Create the sub-issue
+    const result = await linearClient.createIssue({
+        teamId: team?.id,
+        parentId: parent.id,
+        title,
+        description,
+        assigneeId: me.id, // Assign to current user (Dhanush)
+        labelIds: parentLabels.nodes.map((l: any) => l.id),
+        projectId: parentProject?.id,
+        stateId
     });
+
+    // Get the created issue to return full details
+    if (result.success && result.issue) {
+        const createdIssue = await result.issue;
+        return {
+            success: true,
+            issue: createdIssue,
+            identifier: createdIssue.identifier,
+            url: createdIssue.url,
+            parentIdentifier: parent.identifier
+        };
+    }
+
+    return result;
 }
 
 export async function updateIssueStatus(issueId: string, stateId: string) {

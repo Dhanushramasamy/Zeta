@@ -12,7 +12,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: 'function',
         function: {
             name: 'create_issue',
-            description: 'Create a new issue in Linear',
+            description: 'Create a new standalone issue in Linear',
             parameters: {
                 type: 'object',
                 properties: {
@@ -21,6 +21,23 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
                     teamId: { type: 'string', description: 'The team ID (optional, will default if not provided)' },
                 },
                 required: ['title', 'description'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'create_sub_issue',
+            description: 'Create a sub-issue under an existing parent issue. Automatically inherits team, labels, project from parent and assigns to Dhanush.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    parentIssueId: { type: 'string', description: 'The parent issue identifier (e.g., PROB2B-77)' },
+                    title: { type: 'string', description: 'The title of the sub-issue' },
+                    description: { type: 'string', description: 'The description of the sub-issue' },
+                    initialState: { type: 'string', enum: ['Todo', 'In Progress', 'Backlog'], description: 'The initial state. Defaults to In Progress' },
+                },
+                required: ['parentIssueId', 'title', 'description'],
             },
         },
     },
@@ -39,11 +56,96 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
             },
         },
     },
+    {
+        type: 'function',
+        function: {
+            name: 'update_issue_status',
+            description: 'Update the status/state of an existing issue',
+            parameters: {
+                type: 'object',
+                properties: {
+                    issueId: { type: 'string', description: 'The ID of the issue (e.g., LIN-123)' },
+                    stateId: { type: 'string', description: 'The name or ID of the new state (e.g., "Done", "In Progress", "Canceled")' },
+                },
+                required: ['issueId', 'stateId'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'find_issue',
+            description: 'Search for an existing issue. Use this BEFORE creating a new issue or logging work if the Issue ID is unknown.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'Search keywords (e.g., "login page", "API refactor")' },
+                    project: { type: 'string', description: 'Optional project name filter (Divank, Insight-Ally, Acolyte)' },
+                },
+                required: ['query'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'log_daily_work',
+            description: 'Log daily work to the Weekly Status Ticket. Updates today\'s day section (Day 1-5) with planned or completed items.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    description: { type: 'string', description: 'Description of the work' },
+                    logType: { type: 'string', enum: ['planned', 'completed'], description: 'Whether this is a planned item or completed work. Default: completed' },
+                    clientName: { type: 'string', description: 'The client name (Divank, Insight-Ally, Acolyte). Infer from context if possible.' },
+                    issueId: { type: 'string', description: 'Optional: ID of the existing issue worked on (e.g. LIN-123)' },
+                    newIssueTitle: { type: 'string', description: 'Optional: Title for a NEW issue to create and link.' },
+                },
+                required: ['description', 'clientName'],
+            },
+        },
+    },
 ];
 
 export async function POST(request: Request) {
     try {
-        const { messages } = await request.json();
+        const { messages: rawMessages } = await request.json();
+
+        // Helper to sanitize messages: ensure every tool_call in assistant messages has a corresponding tool response
+        const sanitizeMessages = (msgs: any[]) => {
+            const sanitized = [...msgs];
+            for (let i = 0; i < sanitized.length; i++) {
+                const msg = sanitized[i];
+                if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+                    // Find all subsequent tool messages that respond to this assistant message
+                    const respondingToolIds = new Set();
+                    for (let j = i + 1; j < sanitized.length; j++) {
+                        if (sanitized[j].role === 'tool' && sanitized[j].tool_call_id) {
+                            respondingToolIds.add(sanitized[j].tool_call_id);
+                        }
+                    }
+
+                    // Filter tool_calls to only those that have a response
+                    const validToolCalls = msg.tool_calls.filter((tc: any) => respondingToolIds.has(tc.id));
+
+                    // If we filtered out some calls, update the message
+                    if (validToolCalls.length !== msg.tool_calls.length) {
+                        // Create a new message object to avoid mutating the original if needed, 
+                        // though here we are working on a copy of the array logic
+                        sanitized[i] = { ...msg, tool_calls: validToolCalls };
+                    }
+
+                    // If no valid tool calls remain, and content is empty, this message is invalid. 
+                    // However, we usually keep it if it has content.
+                    if (sanitized[i].tool_calls.length === 0 && !sanitized[i].content) {
+                        // This is an edge case; usually there's content or we just remove the tool_calls property
+                        delete sanitized[i].tool_calls;
+                    }
+                }
+            }
+            return sanitized;
+        };
+
+        const messages = sanitizeMessages(rawMessages);
 
         // 1. Fetch Context (Active Issues & Users)
         const [issues, users] = await Promise.all([
@@ -76,42 +178,38 @@ Description: ${i.description || 'No description'}
 
         const systemMessage = {
             role: 'system',
-            content: `You are a helpful work assistant for Dhanush. 
+            content: `You are Zeta, the premium personal project management assistant for Dhanush. 
       
-You have access to his active Linear issues with full details:
+Your goal is to help Dhanush manage his tickets, track mentions, and update his work efficiently.
+
+**Context:**
+- Active Issues for Dhanush:
 ${issuesContext}
 
-And these team members:
+- Team Members:
 ${usersContext}
 
-**Response Guidelines:**
-1. **Be CONCISE** - Keep responses short and scannable
-2. **Use Visual Hierarchy:**
-   - Use emojis for quick scanning (🔴 Urgent, 🟡 High, 📅 Due Soon, ✅ Done, 🏃 In Progress)
-   - Group by Status, Priority, or Project when showing multiple issues
-   - Use bullet points, not paragraphs
-3. **Smart Grouping:**
-   - For "what's in progress" → Group by project
-   - For "what's due" → Sort by date
-   - For "high priority" → Show priority first
-4. **Format:**
-   - Issue format: **[ID]** Title (Status, Priority, Due Date if relevant)
-   - Keep descriptions to 1 line max
-   - Only show relevant fields
-
-**Example Good Response:**
-🔴 **Urgent (2)**
-• **IA-120** Synthesia Video Feature (In Progress, Due Nov 20)
-• **DEV-2231** Email Unsubscribe (QA, Due Nov 21)
-
-🟡 **High Priority (1)**
-• **PROB2B-9** JSON Schema (In Progress, Due Nov 26)
+**Operational Rules:**
+1. **Dhanush First**: Always prioritize issues assigned to Dhanush or where he is mentioned.
+2. **Be Zeta**: Maintain a professional, sleek, and highly efficient helpful persona.
+3. **Response Guidelines:**
+   - Use emojis strategically: 🔴 Urgent, 🟡 High, 📅 Due, ✅ Done, 🏃 In Progress, 📨 Mentioned
+   - Group information logically (by Status, Priority, or Project)
+   - Keep it concise. Use bullet points.
+4. **Issue References**: Always use identifiers like [LIN-123].
 
 **Actions:**
-- If he asks to create/comment, use tool calls
-- ALWAYS use tool calls for actions, never just say you did it
-- When referring to issues, use their identifier (e.g., LIN-123)
-      `,
+- Use 'create_issue' to start new tasks.
+- Use 'post_comment' to add updates to existing tickets.
+- Use 'update_issue_status' to change the state of a ticket.
+- Use 'log_daily_work' when Dhanush interacts about "daily updates" or "logging work".
+    - NOTE: This ONLY updates the Weekly Status Ticket description. It does NOT automatically comment on or close the dev ticket.
+    - If Dhanush says he "finished" or "completed" a specific ticket, you MUST ALSO call 'update_issue_status' (to Done) or 'post_comment' separately.
+    - If he worked on a known issue, pass 'issueId'.
+    - If he worked on a NEW task, pass 'newIssueTitle' (Zeta will create it automatically).
+    - Always infer the 'clientName' (Divank, Insight-Ally, Acolyte) if possible, or ask.
+- ALWAYS use tool calls for these actions. Combos are encouraged (e.g. log_daily_work + update_issue_status).
+`,
         };
 
         // 3. Call OpenAI

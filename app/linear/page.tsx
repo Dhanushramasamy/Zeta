@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, AlertCircle, RefreshCw, Edit2, X, Send, ChevronDown, ChevronUp, MessageSquare, ArrowLeft } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, RefreshCw, Edit2, X, Send, ChevronDown, ChevronUp, MessageSquare, ArrowLeft, Flame } from 'lucide-react';
 import Link from 'next/link';
+import { Sidebar } from '@/components/Sidebar';
+import WorkflowModals from '@/components/WorkflowModals';
 
 interface SuggestedAction {
     id: string;
@@ -33,6 +35,7 @@ export default function LinearPage() {
     const [suggestions, setSuggestions] = useState<SuggestedAction[]>([]);
     const [executionResults, setExecutionResults] = useState<{ status: string; error?: string; action: SuggestedAction }[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [workflowModal, setWorkflowModal] = useState<'weekly' | 'daily' | null>(null);
 
     const [refiningId, setRefiningId] = useState<string | null>(null);
     const [refinementPrompt, setRefinementPrompt] = useState('');
@@ -185,357 +188,307 @@ export default function LinearPage() {
     };
 
     return (
-        <main className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white p-8 font-sans">
-            <div className="max-w-3xl mx-auto space-y-8">
-                <header className="space-y-2 relative">
-                    <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-cyan-400 hover:text-cyan-300 mb-4">
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to ZETA
-                    </Link>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                        Linear Assistant
-                    </h1>
-                    <p className="text-lg text-gray-400">Turn your daily notes into Linear updates automatically.</p>
-                </header>
+        <div className="min-h-screen bg-[#F2F4F8] text-gray-900 font-sans p-6 selection:bg-orange-200">
+            {/* Background Decorative */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-orange-100/50 rounded-full blur-[100px]" />
+                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-100/50 rounded-full blur-[100px]" />
+            </div>
 
-                {/* Project Selection */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6">
-                    <label htmlFor="project-select" className="block text-sm font-medium text-gray-300 mb-2">
-                        Select Project
-                    </label>
-                    <select
-                        id="project-select"
-                        value={selectedProjectId}
-                        onChange={(e) => setSelectedProjectId(e.target.value)}
-                        disabled={isLoadingProjects}
-                        className="w-full rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm p-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <option value="" className="bg-slate-900">All Projects</option>
-                        {projects.map((project) => (
-                            <option key={project.id} value={project.name} className="bg-slate-900">
-                                {project.name}
-                            </option>
-                        ))}
-                    </select>
-                    {selectedProjectId && (
-                        <p className="mt-2 text-xs text-cyan-400">
-                            🎯 Analysis will focus on: <span className="font-semibold">{selectedProjectId}</span>
-                        </p>
-                    )}
-                </div>
+            <div className="flex gap-8 relative z-10 h-[calc(100vh-48px)]">
+                <Sidebar onWorkflowOpen={(type) => setWorkflowModal(type)} />
 
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 space-y-4">
-                    <label htmlFor="notes" className="block text-sm font-medium text-gray-300">
-                        Daily Notes
-                    </label>
-                    <textarea
-                        id="notes"
-                        rows={6}
-                        className="w-full rounded-lg bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm p-3 border"
-                        placeholder="e.g., Fixed the login bug (LIN-123), started working on the new dashboard..."
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                    />
-                    <div className="flex justify-end">
-                        <button
-                            onClick={handleAnalyze}
-                            disabled={isAnalyzing || !notes.trim()}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isAnalyzing ? (
-                                <>
-                                    <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                    Analyzing...
-                                </>
-                            ) : (
-                                <>
-                                    <RefreshCw className="-ml-1 mr-2 h-4 w-4" />
-                                    Analyze Updates
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
+                <main className="flex-1 flex flex-col min-w-0 pr-4 overflow-y-auto">
 
-                {error && (
-                    <div className="rounded-md bg-red-500/10 border border-red-500/20 p-4">
-                        <div className="flex">
-                            <div className="flex-shrink-0">
-                                <AlertCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
+                    <header className="mb-8">
+                        <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-orange-500 mb-4 transition-colors">
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to ZETA
+                        </Link>
+                        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-2">Linear Assistant</h1>
+                        <p className="text-gray-500 font-medium">Turn your daily notes into Linear updates automatically.</p>
+                    </header>
+
+                    <div className="space-y-8 max-w-4xl">
+
+                        {/* Input Section */}
+                        <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100 space-y-6">
+
+                            {/* Project Select */}
+                            <div>
+                                <label htmlFor="project-select" className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                                    Select Project
+                                </label>
+                                <select
+                                    id="project-select"
+                                    value={selectedProjectId}
+                                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                                    disabled={isLoadingProjects}
+                                    className="w-full rounded-2xl bg-gray-50 border border-gray-100 text-gray-900 font-medium p-4 focus:ring-2 focus:ring-orange-100 outline-none transition-all disabled:opacity-50"
+                                >
+                                    <option value="">All Projects</option>
+                                    {projects.map((project) => (
+                                        <option key={project.id} value={project.name}>
+                                            {project.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedProjectId && (
+                                    <p className="mt-2 text-xs text-orange-500 font-bold ml-1">
+                                        🎯 Focusing on: {selectedProjectId}
+                                    </p>
+                                )}
                             </div>
-                            <div className="ml-3">
-                                <h3 className="text-sm font-medium text-red-300">Error</h3>
-                                <div className="mt-2 text-sm text-red-200">
-                                    <p>{error}</p>
+
+                            {/* Notes Input */}
+                            <div>
+                                <label htmlFor="notes" className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                                    Daily Notes
+                                </label>
+                                <textarea
+                                    id="notes"
+                                    rows={6}
+                                    className="w-full rounded-2xl bg-gray-50 border border-gray-100 text-gray-900 font-medium p-4 focus:ring-2 focus:ring-orange-100 outline-none transition-all placeholder:text-gray-400"
+                                    placeholder="e.g., Fixed the login bug (LIN-123), started working on the new dashboard..."
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    onClick={handleAnalyze}
+                                    disabled={isAnalyzing || !notes.trim()}
+                                    className="inline-flex items-center px-8 py-4 bg-orange-500 text-white font-bold rounded-full shadow-lg shadow-orange-500/20 hover:bg-orange-600 hover:shadow-xl hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                >
+                                    {isAnalyzing ? (
+                                        <>
+                                            <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5" />
+                                            Analyzing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <RefreshCw className="-ml-1 mr-2 h-5 w-5" />
+                                            Analyze Updates
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div className="rounded-2xl bg-red-50 border border-red-100 p-6 flex items-start gap-4">
+                                <AlertCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
+                                <div>
+                                    <h3 className="text-sm font-bold text-red-800">Error</h3>
+                                    <p className="mt-1 text-sm text-red-600 font-medium">{error}</p>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                )}
+                        )}
 
-                {suggestions.length > 0 && (
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-semibold text-white">Suggested Updates</h2>
-                            <button
-                                onClick={handleExecuteAll}
-                                disabled={executingIds.size > 0}
-                                className="text-sm font-medium text-cyan-400 hover:text-cyan-300 disabled:opacity-50"
-                            >
-                                Apply All
-                            </button>
-                        </div>
-                        <div className="space-y-3">
-                            {suggestions.map((action) => (
-                                <div key={action.id} className="bg-white/5 backdrop-blur-sm rounded-lg border border-white/10 p-4 shadow-sm flex flex-col gap-3 transition-all hover:border-cyan-500/30">
-                                    <div className="flex items-start justify-between">
-                                        <div className="space-y-1 flex-1 mr-4">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${action.type === 'create_issue' ? 'bg-green-500/20 text-green-300' : 'bg-blue-500/20 text-blue-300'
-                                                    }`}>
-                                                    {action.type === 'create_issue' ? 'Create Issue' : 'Comment / Update'}
-                                                </span>
-                                                {action.issueIdentifier && (
-                                                    <span className="text-sm font-mono text-cyan-400 font-bold">{action.issueIdentifier}</span>
-                                                )}
-                                                {action.project && (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-1">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-                                                        {action.project}
-                                                    </span>
-                                                )}
-                                                {action.issueDetails?.project && !action.project && (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-gray-300">
-                                                        {action.issueDetails.project.name}
-                                                    </span>
-                                                )}
-                                                {action.issueDetails?.dueDate && (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-300">
-                                                        Due: {action.issueDetails.dueDate}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {action.issueDetails && (
-                                                <div className="text-sm text-gray-400">
-                                                    <span className="font-medium text-white">{action.issueDetails.title}</span>
-                                                    <span className="mx-2 text-gray-600">|</span>
-                                                    <span className="text-gray-400">{action.issueDetails.state.name}</span>
-                                                </div>
-                                            )}
-                                            {action.title && <h3 className="font-medium text-white">{action.title}</h3>}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {action.issueDetails?.url && (
-                                                <a
-                                                    href={action.issueDetails.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="p-1.5 text-gray-400 hover:text-cyan-400 rounded-full hover:bg-cyan-500/10 transition-colors"
-                                                    title="Open in Linear"
-                                                >
-                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                    </svg>
-                                                </a>
-                                            )}
-                                            <button
-                                                onClick={() => {
-                                                    if (refiningId === action.id) {
-                                                        setRefiningId(null);
-                                                        setRefinementPrompt('');
-                                                    } else {
-                                                        setRefiningId(action.id);
-                                                        setRefinementPrompt('');
-                                                    }
-                                                }}
-                                                className="p-1.5 text-gray-400 hover:text-cyan-400 rounded-full hover:bg-cyan-500/10 transition-colors"
-                                                title="Refine this suggestion"
-                                            >
-                                                {refiningId === action.id ? <X className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
-                                            </button>
-                                            <button
-                                                onClick={() => handleExecute(action)}
-                                                disabled={executingIds.has(action.id)}
-                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                {executingIds.has(action.id) ? (
-                                                    <Loader2 className="animate-spin h-3 w-3" />
-                                                ) : (
-                                                    'Apply'
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {refiningId === action.id ? (
-                                        <div className="mt-2 p-3 bg-cyan-500/10 rounded-md border border-cyan-500/20 space-y-2">
-                                            <div className="flex gap-2 mb-2">
-                                                <button
-                                                    onClick={() => {
-                                                        setEditMode('ai');
-                                                        setManualEditContent('');
-                                                    }}
-                                                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${editMode === 'ai'
-                                                        ? 'bg-cyan-600 text-white'
-                                                        : 'bg-white/5 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/10'
-                                                        }`}
-                                                >
-                                                    🤖 AI Refine
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setEditMode('manual');
-                                                        setManualEditContent(action.description || '');
-                                                        setRefinementPrompt('');
-                                                    }}
-                                                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${editMode === 'manual'
-                                                        ? 'bg-cyan-600 text-white'
-                                                        : 'bg-white/5 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/10'
-                                                        }`}
-                                                >
-                                                    ✏️ Manual Edit
-                                                </button>
-                                            </div>
-
-                                            {editMode === 'ai' ? (
-                                                <div>
-                                                    <label className="block text-xs font-medium text-cyan-300 mb-1">
-                                                        Tell AI how to refine this
-                                                    </label>
-                                                    <div className="flex gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={refinementPrompt}
-                                                            onChange={(e) => setRefinementPrompt(e.target.value)}
-                                                            placeholder="e.g., Add more details about the API, tag @bob..."
-                                                            className="flex-1 text-sm rounded-md bg-white/5 border-cyan-500/20 text-white placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500"
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter' && !e.shiftKey) {
-                                                                    e.preventDefault();
-                                                                    handleRefine(action);
-                                                                }
-                                                            }}
-                                                        />
-                                                        <button
-                                                            onClick={() => handleRefine(action)}
-                                                            disabled={isRefining || !refinementPrompt.trim()}
-                                                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50"
-                                                        >
-                                                            {isRefining ? <Loader2 className="animate-spin h-3 w-3" /> : <Send className="h-3 w-3" />}
-                                                        </button>
+                        {suggestions.length > 0 && (
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between px-2">
+                                    <h2 className="text-2xl font-bold text-gray-900">Suggested Updates</h2>
+                                    <button
+                                        onClick={handleExecuteAll}
+                                        disabled={executingIds.size > 0}
+                                        className="text-sm font-bold text-orange-500 hover:text-orange-600 bg-orange-50 px-4 py-2 rounded-full transition-colors disabled:opacity-50"
+                                    >
+                                        Apply All
+                                    </button>
+                                </div>
+                                <div className="space-y-4">
+                                    {suggestions.map((action) => (
+                                        <div key={action.id} className="bg-white rounded-[24px] border border-gray-100 p-6 shadow-sm hover:shadow-lg transition-all group">
+                                            <div className="flex items-start justify-between">
+                                                <div className="space-y-2 flex-1 mr-6">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${action.type === 'create_issue' ? 'bg-green-100 text-green-700' : 'bg-blue-50 text-blue-600'
+                                                            }`}>
+                                                            {action.type === 'create_issue' ? 'Create Issue' : 'Comment / Update'}
+                                                        </span>
+                                                        {action.issueIdentifier && (
+                                                            <span className="text-sm font-mono text-gray-500 font-bold bg-gray-50 px-2 py-0.5 rounded-lg">{action.issueIdentifier}</span>
+                                                        )}
+                                                        {action.project && (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-purple-50 text-purple-600">
+                                                                {action.project}
+                                                            </span>
+                                                        )}
+                                                        {action.issueDetails?.dueDate && (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-600">
+                                                                Due: {action.issueDetails.dueDate}
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                </div>
-                                            ) : (
-                                                <div>
-                                                    <label className="block text-xs font-medium text-cyan-300 mb-1">
-                                                        Edit description directly
-                                                    </label>
-                                                    <div className="space-y-2">
-                                                        <textarea
-                                                            value={manualEditContent}
-                                                            onChange={(e) => setManualEditContent(e.target.value)}
-                                                            rows={4}
-                                                            className="w-full text-sm rounded-md bg-white/5 border-cyan-500/20 text-white placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500"
-                                                            placeholder="Edit the description..."
-                                                        />
-                                                        <div className="flex gap-2 justify-end">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setRefiningId(null);
-                                                                    setManualEditContent('');
-                                                                }}
-                                                                className="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-300"
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleManualSave(action)}
-                                                                disabled={!manualEditContent.trim()}
-                                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50"
-                                                            >
-                                                                Save Changes
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <p className="text-gray-300 text-sm bg-white/5 p-2 rounded border border-white/10">
-                                            {action.description}
-                                        </p>
-                                    )}
 
-                                    <p className="text-xs text-gray-500 italic">Reasoning: {action.reasoning}</p>
-
-                                    {action.issueDetails && (
-                                        <div className="border-t border-white/10 pt-3 mt-2">
-                                            <button
-                                                onClick={() => setExpandedId(expandedId === action.id ? null : action.id)}
-                                                className="flex items-center gap-2 text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
-                                            >
-                                                {expandedId === action.id ? (
-                                                    <>
-                                                        <ChevronUp className="h-4 w-4" />
-                                                        Hide Details
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <ChevronDown className="h-4 w-4" />
-                                                        View Full Issue Details
-                                                    </>
-                                                )}
-                                            </button>
-
-                                            {expandedId === action.id && (
-                                                <div className="mt-3 p-4 bg-white/5 rounded-lg border border-white/10 space-y-3">
-                                                    {action.issueDetails.description && (
-                                                        <div>
-                                                            <h4 className="text-xs font-semibold text-gray-300 mb-1">Description</h4>
-                                                            <p className="text-sm text-gray-400 whitespace-pre-wrap">{action.issueDetails.description}</p>
+                                                    {action.issueDetails && (
+                                                        <div className="text-sm text-gray-500 font-medium flex items-center gap-2">
+                                                            <span className="text-gray-900">{action.issueDetails.title}</span>
+                                                            <span className="w-1 h-1 rounded-full bg-gray-300" />
+                                                            <span>{action.issueDetails.state.name}</span>
                                                         </div>
                                                     )}
 
-                                                    <div className="flex gap-4 flex-wrap">
-                                                        {action.issueDetails.priorityLabel && (
-                                                            <div>
-                                                                <h4 className="text-xs font-semibold text-gray-300 mb-1">Priority</h4>
-                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${action.issueDetails.priority === 1 ? 'bg-red-500/20 text-red-300' :
-                                                                    action.issueDetails.priority === 2 ? 'bg-orange-500/20 text-orange-300' :
-                                                                        action.issueDetails.priority === 3 ? 'bg-yellow-500/20 text-yellow-300' :
-                                                                            'bg-gray-500/20 text-gray-300'
-                                                                    }`}>
-                                                                    {action.issueDetails.priorityLabel}
-                                                                </span>
-                                                            </div>
+                                                    {action.title && <h3 className="font-bold text-gray-900">{action.title}</h3>}
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (refiningId === action.id) {
+                                                                setRefiningId(null);
+                                                                setRefinementPrompt('');
+                                                            } else {
+                                                                setRefiningId(action.id);
+                                                                setRefinementPrompt('');
+                                                            }
+                                                        }}
+                                                        className="p-2 text-gray-400 hover:text-orange-500 rounded-full hover:bg-orange-50 transition-colors"
+                                                        title="Refine"
+                                                    >
+                                                        {refiningId === action.id ? <X className="h-5 w-5" /> : <Edit2 className="h-5 w-5" />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleExecute(action)}
+                                                        disabled={executingIds.has(action.id)}
+                                                        className="inline-flex items-center px-4 py-2 border border-transparent text-xs font-bold rounded-xl shadow-sm text-white bg-gray-900 hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50 transition-all"
+                                                    >
+                                                        {executingIds.has(action.id) ? (
+                                                            <Loader2 className="animate-spin h-4 w-4" />
+                                                        ) : (
+                                                            'Apply'
                                                         )}
-                                                        {action.issueDetails.labels && action.issueDetails.labels.length > 0 && (
-                                                            <div>
-                                                                <h4 className="text-xs font-semibold text-gray-300 mb-1">Labels</h4>
-                                                                <div className="flex gap-1 flex-wrap">
-                                                                    {action.issueDetails.labels.map((label, idx) => (
-                                                                        <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-300">
-                                                                            {label.name}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {refiningId === action.id ? (
+                                                <div className="mt-4 p-4 bg-orange-50/50 rounded-2xl border border-orange-100 space-y-3">
+                                                    <div className="flex gap-2 mb-2 p-1 bg-white rounded-xl border border-gray-100 w-fit">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditMode('ai');
+                                                                setManualEditContent('');
+                                                            }}
+                                                            className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${editMode === 'ai'
+                                                                ? 'bg-orange-500 text-white shadow-sm'
+                                                                : 'text-gray-500 hover:bg-gray-50'
+                                                                }`}
+                                                        >
+                                                            🤖 AI Refine
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditMode('manual');
+                                                                setManualEditContent(action.description || '');
+                                                                setRefinementPrompt('');
+                                                            }}
+                                                            className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${editMode === 'manual'
+                                                                ? 'bg-orange-500 text-white shadow-sm'
+                                                                : 'text-gray-500 hover:bg-gray-50'
+                                                                }`}
+                                                        >
+                                                            ✏️ Manual Edit
+                                                        </button>
                                                     </div>
+
+                                                    {editMode === 'ai' ? (
+                                                        <div className="flex gap-3">
+                                                            <input
+                                                                type="text"
+                                                                value={refinementPrompt}
+                                                                onChange={(e) => setRefinementPrompt(e.target.value)}
+                                                                placeholder="e.g., Add more details..."
+                                                                className="flex-1 text-sm rounded-xl bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:ring-orange-500 p-3"
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                                        e.preventDefault();
+                                                                        handleRefine(action);
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <button
+                                                                onClick={() => handleRefine(action)}
+                                                                disabled={isRefining || !refinementPrompt.trim()}
+                                                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-50"
+                                                            >
+                                                                {isRefining ? <Loader2 className="animate-spin h-4 w-4" /> : <Send className="h-4 w-4" />}
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            <textarea
+                                                                value={manualEditContent}
+                                                                onChange={(e) => setManualEditContent(e.target.value)}
+                                                                rows={4}
+                                                                className="w-full text-sm rounded-xl bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:ring-orange-500 p-3"
+                                                                placeholder="Edit Description..."
+                                                            />
+                                                            <div className="flex gap-2 justify-end">
+                                                                <button
+                                                                    onClick={() => handleManualSave(action)}
+                                                                    disabled={!manualEditContent.trim()}
+                                                                    className="px-4 py-2 bg-orange-500 text-white rounded-xl text-xs font-bold hover:bg-orange-600 transition-colors disabled:opacity-50"
+                                                                >
+                                                                    Save
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 text-sm text-gray-600 leading-relaxed font-medium">
+                                                    {action.description}
+                                                </div>
+                                            )}
+
+                                            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                                                <p className="text-xs text-gray-400 font-medium italic">Reasoning: {action.reasoning}</p>
+
+                                                {action.issueDetails && (
+                                                    <button
+                                                        onClick={() => setExpandedId(expandedId === action.id ? null : action.id)}
+                                                        className="flex items-center gap-1 text-xs font-bold text-orange-500 hover:text-orange-600 transition-colors"
+                                                    >
+                                                        {expandedId === action.id ? (
+                                                            <>
+                                                                <ChevronUp className="h-4 w-4" />
+                                                                Less Info
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <ChevronDown className="h-4 w-4" />
+                                                                More Info
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {expandedId === action.id && action.issueDetails && (
+                                                <div className="mt-4 p-5 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-4 animate-in slide-in-from-top-2">
+                                                    {action.issueDetails.description && (
+                                                        <div>
+                                                            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-2">Description</h4>
+                                                            <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">{action.issueDetails.description}</p>
+                                                        </div>
+                                                    )}
 
                                                     {action.issueDetails.comments && action.issueDetails.comments.length > 0 && (
                                                         <div>
-                                                            <h4 className="text-xs font-semibold text-gray-300 mb-2 flex items-center gap-1">
+                                                            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-2 flex items-center gap-2">
                                                                 <MessageSquare className="h-3 w-3" />
-                                                                Recent Comments ({action.issueDetails.comments.length})
+                                                                Recent Comments
                                                             </h4>
                                                             <div className="space-y-2">
                                                                 {action.issueDetails.comments.map((comment, idx) => (
-                                                                    <div key={idx} className="bg-white/5 p-2 rounded border border-white/10">
-                                                                        <p className="text-xs font-medium text-gray-300 mb-1">
-                                                                            {comment.user?.name || 'Unknown'}
-                                                                        </p>
-                                                                        <p className="text-xs text-gray-400 whitespace-pre-wrap">{comment.body}</p>
+                                                                    <div key={idx} className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                                                        <div className="flex justify-between items-center mb-1">
+                                                                            <span className="text-xs font-bold text-gray-900">{comment.user?.name || 'Unknown'}</span>
+                                                                        </div>
+                                                                        <p className="text-xs text-gray-600 whitespace-pre-wrap">{comment.body}</p>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -546,52 +499,63 @@ export default function LinearPage() {
                                                         href={action.issueDetails.url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="inline-flex items-center text-xs font-medium text-cyan-400 hover:text-cyan-300"
+                                                        className="inline-flex items-center gap-1 text-xs font-bold text-gray-900 hover:text-orange-500 transition-colors"
                                                     >
                                                         Open in Linear →
                                                     </a>
                                                 </div>
                                             )}
                                         </div>
-                                    )}
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                            </div>
+                        )}
 
-                {executionResults.length > 0 && (
-                    <div className="space-y-4">
-                        <h2 className="text-xl font-semibold text-white">Execution Results</h2>
-                        <div className="bg-white/5 backdrop-blur-sm rounded-lg border border-white/10 divide-y divide-white/10">
-                            {executionResults.map((res, idx) => (
-                                <div key={idx} className="p-4 flex items-start gap-3">
-                                    {res.status === 'success' ? (
-                                        <CheckCircle className="h-5 w-5 text-green-400 mt-0.5" />
-                                    ) : (
-                                        <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
-                                    )}
-                                    <div>
-                                        <p className="text-sm font-medium text-white">
-                                            {res.status === 'success' ? 'Successfully updated' : 'Failed to update'}
-                                        </p>
-                                        {res.error && <p className="text-sm text-red-300">{res.error}</p>}
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            {res.action.type} {res.action.issueIdentifier ? `on ${res.action.issueIdentifier} ` : ''}
-                                        </p>
-                                    </div>
+                        {executionResults.length > 0 && (
+                            <div className="bg-gray-900 rounded-[24px] p-6 text-white shadow-lg shadow-gray-900/10">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-bold">Execution Results</h2>
+                                    <button
+                                        onClick={() => setExecutionResults([])}
+                                        className="text-xs font-bold text-gray-400 hover:text-white transition-colors"
+                                    >
+                                        Clear
+                                    </button>
                                 </div>
-                            ))}
-                        </div>
-                        <button
-                            onClick={() => setExecutionResults([])}
-                            className="text-sm text-cyan-400 hover:text-cyan-300"
-                        >
-                            Clear Results
-                        </button>
+                                <div className="space-y-3">
+                                    {executionResults.map((res, idx) => (
+                                        <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
+                                            {res.status === 'success' ? (
+                                                <CheckCircle className="h-5 w-5 text-green-400 mt-0.5" />
+                                            ) : (
+                                                <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
+                                            )}
+                                            <div>
+                                                <p className="text-sm font-bold">
+                                                    {res.status === 'success' ? 'Success' : 'Failed'}
+                                                </p>
+                                                {res.error && <p className="text-xs text-red-300 mt-1">{res.error}</p>}
+                                                <p className="text-xs text-gray-400 mt-1">
+                                                    {res.action.type} {res.action.issueIdentifier ? `on ${res.action.issueIdentifier}` : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                     </div>
-                )}
+
+                    <div className="h-20" /> {/* Spacer */}
+                </main>
+
+                <WorkflowModals
+                    type={workflowModal}
+                    onClose={() => setWorkflowModal(null)}
+                    onSuccess={(msg) => alert(msg)}
+                />
             </div>
-        </main>
+        </div>
     );
 }
