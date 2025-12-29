@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getIssuesFromSupabase, getUsers } from '@/lib/linear';
+import { getIssuesFromSupabase, getUsers, getIssueDetailsByIdentifier } from '@/lib/linear';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -108,7 +108,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 
 export async function POST(request: Request) {
     try {
-        const { messages: rawMessages } = await request.json();
+        const { messages: rawMessages } = (await request.json()) as { messages: any[] };
 
         // Helper to sanitize messages: ensure every tool_call in assistant messages has a corresponding tool response
         const sanitizeMessages = (msgs: any[]) => {
@@ -147,13 +147,44 @@ export async function POST(request: Request) {
 
         const messages = sanitizeMessages(rawMessages);
 
-        // 1. Fetch Context (Active Issues & Users)
+        // 1. Detect and Fetch Explicit Issue Context
+        const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')?.content || '';
+        const issueIdRegex = /\b([A-Z]+[A-Z0-9]*-\d+)\b/g;
+        const mentionedIssueIds: string[] = Array.from(new Set(lastUserMessage.match(issueIdRegex) || []));
+
+        let explicitIssuesContext = '';
+        if (mentionedIssueIds.length > 0) {
+            const detailPromises = mentionedIssueIds.map(id => getIssueDetailsByIdentifier(id));
+            const details = await Promise.all(detailPromises);
+
+            explicitIssuesContext = details
+                .filter(d => d !== null)
+                .map(d => {
+                    const labels = d!.labels?.map(l => l.name).join(', ') || 'None';
+                    const comments = d!.comments?.map(c => `[${c.user?.name}]: ${c.body}`).join('\n') || 'No comments';
+                    return `
+--- DETAILED DATA FOR MENTIONED ISSUE: ${d!.identifier} ---
+Title: ${d!.title}
+Status: ${d!.state.name}
+Priority: ${d!.priorityLabel || 'No Priority'}
+Project: ${d!.project?.name || 'No Project'}
+Team: ${d!.team?.name}
+Labels: ${labels}
+Due Date: ${d!.dueDate || 'None'}
+Description: ${d!.description || 'No description'}
+Recent Comments:
+${comments}
+`;
+                }).join('\n');
+        }
+
+        // 2. Fetch General Context (Active Issues & Users)
         const [issues, users] = await Promise.all([
             getIssuesFromSupabase(),
             getUsers()
         ]);
 
-        // 2. Prepare System Prompt with Context
+        // 3. Prepare System Prompt with Context
         const issuesContext = issues
             .map((i) => {
                 const labels = i.labels?.map(l => l.name).join(', ') || 'None';
@@ -181,6 +212,11 @@ Description: ${i.description || 'No description'}
             content: `You are Zeta, the premium personal project management assistant for Dhanush. 
       
 Your goal is to help Dhanush manage his tickets, track mentions, and update his work efficiently.
+
+${explicitIssuesContext ? `**IMPORTANT: DHANUSH HAS SPECIFICALLY MENTIONED THESE ISSUES. FOCUS YOUR RESPONSE ON THESE:**
+${explicitIssuesContext}
+---
+` : ''}
 
 **Context:**
 - Active Issues for Dhanush:
