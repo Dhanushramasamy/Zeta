@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, Loader2, ArrowLeft, Eye, ExternalLink, X, MessageSquare, Flame, Hash, Search, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { Sidebar } from '@/components/Sidebar';
-import WorkflowModals from '@/components/WorkflowModals';
 
 interface ToolCall {
     id: string;
@@ -139,7 +138,6 @@ export default function ChatPage() {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [workflowModal, setWorkflowModal] = useState<'weekly' | 'daily' | null>(null);
 
     // Issue Details Modal State
     const [selectedIssue, setSelectedIssue] = useState<any>(null);
@@ -346,7 +344,7 @@ export default function ChatPage() {
             </div>
 
             <div className="flex gap-8 relative z-10 h-[calc(100vh-48px)]">
-                <Sidebar onWorkflowOpen={(type) => setWorkflowModal(type)} />
+                <Sidebar />
 
                 <main className="flex-1 flex flex-col min-w-0 pr-4 bg-white rounded-[32px] shadow-sm border border-gray-100 overflow-hidden relative">
 
@@ -543,11 +541,6 @@ export default function ChatPage() {
                     </div>
                 </main>
 
-                <WorkflowModals
-                    type={workflowModal}
-                    onClose={() => setWorkflowModal(null)}
-                    onSuccess={(msg) => alert(msg)}
-                />
 
                 {/* Issue Details Modal */}
                 {isModalOpen && selectedIssue && (

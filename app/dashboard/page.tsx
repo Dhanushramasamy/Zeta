@@ -57,7 +57,7 @@ export default function Dashboard() {
     const [workflowStates, setWorkflowStates] = useState<{ id: string; name: string; color: string }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [workflowModal, setWorkflowModal] = useState<'weekly' | 'daily' | null>(null);
+    const [workflowModal, setWorkflowModal] = useState<'weekly' | null>(null);
     const [activeStatuses, setActiveStatuses] = useState<WorkflowStatus[]>();
 
     // New States for Filters and Dropdown
@@ -179,7 +179,7 @@ export default function Dashboard() {
 
             <div className="flex gap-8 relative z-10 h-[calc(100vh-48px)]">
 
-                <Sidebar onWorkflowOpen={(type) => setWorkflowModal(type)} />
+                <Sidebar />
 
                 {/* Main Content Area */}
                 <main className="flex-1 flex flex-col min-w-0 pr-4">

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createComment, createIssue, createSubIssue, getIssueByIdentifier, getIssuesFromSupabase } from '@/lib/linear';
-import { processDailyUpdate } from '@/lib/workflows';
 
 export async function POST(request: Request) {
     try {
@@ -99,45 +98,6 @@ export async function POST(request: Request) {
                         status: 'success',
                         action,
                         data: { foundIssues: issues }
-                    });
-                } else if (action.type === 'log_daily_work') {
-                    const { description, clientName, issueIdentifier, issueTitle, logType } = action;
-
-                    if (!clientName) throw new Error('Client name required for daily update');
-
-                    let relatedTickets: string[] = [];
-
-                    // CASE 1: Issue ID provided -> Link it
-                    if (issueIdentifier) {
-                        relatedTickets.push(issueIdentifier);
-                    }
-                    // CASE 2: New Issue Title provided -> Create it then Link it
-                    else if (issueTitle) {
-                        const newIssue = await createIssue({
-                            title: issueTitle,
-                            description: description // Use the work description for the ticket too
-                        });
-                        if (newIssue.success && newIssue.issue) {
-                            const issue = await newIssue.issue;
-                            relatedTickets.push(issue.identifier);
-                        }
-                    }
-
-                    // Determine log type - default to 'completed' for backward compatibility
-                    const actualLogType = logType === 'planned' ? 'planned' : 'completed';
-
-                    // Call shared workflow logic (new signature)
-                    const result = await processDailyUpdate(clientName, actualLogType, description, relatedTickets);
-
-                    results.push({
-                        status: 'success',
-                        action,
-                        data: {
-                            statusTicket: result.ticket.identifier,
-                            dayNumber: result.dayNumber,
-                            section: result.section,
-                            related: relatedTickets
-                        }
                     });
                 } else if (action.type === 'update_status') {
                     // Update Issue Status

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Zap, MessageSquare, FileText, Sparkles, Brain, Network, Layout, Activity } from 'lucide-react';
+import { ArrowRight, MessageSquare, Brain, Layout } from 'lucide-react';
 
 export default function LandingPage() {
   return (
@@ -24,7 +24,6 @@ export default function LandingPage() {
           <nav className="hidden md:flex gap-8 items-center bg-white/50 backdrop-blur-sm px-6 py-3 rounded-full border border-white/50 shadow-sm">
             <Link href="/dashboard" className="text-sm font-bold text-gray-500 hover:text-orange-500 transition-colors">Dashboard</Link>
             <Link href="/chat" className="text-sm font-bold text-gray-500 hover:text-orange-500 transition-colors">Chat</Link>
-            <Link href="/linear" className="text-sm font-bold text-gray-500 hover:text-orange-500 transition-colors">Linear Sync</Link>
           </nav>
           <div className="w-12" /> {/* Spacer for balance */}
         </header>
@@ -46,7 +45,7 @@ export default function LandingPage() {
           </p>
 
           {/* Feature Cards as Navigation */}
-          <div className="grid md:grid-cols-3 gap-6 w-full max-w-5xl px-4 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-300">
+          <div className="grid md:grid-cols-2 gap-8 w-full max-w-4xl px-4 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-300">
 
             {/* Dashboard Card */}
             <Link href="/dashboard" className="group relative bg-white rounded-[40px] p-8 border border-white shadow-xl shadow-gray-200/50 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col items-start text-left overflow-hidden">
@@ -74,18 +73,6 @@ export default function LandingPage() {
               </div>
             </Link>
 
-            {/* Linear Sync Card */}
-            <Link href="/linear" className="group relative bg-white rounded-[40px] p-8 border border-white shadow-xl shadow-gray-200/50 hover:shadow-2xl hover:shadow-green-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col items-start text-left overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-bl-[100px] z-0 transition-transform group-hover:scale-110 origin-top-right" />
-              <div className="relative z-10 w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mb-6">
-                <Activity className="h-7 w-7 text-green-600" />
-              </div>
-              <h3 className="relative z-10 text-2xl font-bold text-gray-900 mb-2">Linear Sync</h3>
-              <p className="relative z-10 text-gray-500 font-medium mb-6">Turn your rough notes into perfect Linear updates.</p>
-              <div className="relative z-10 mt-auto flex items-center gap-2 text-green-600 font-bold text-sm group-hover:gap-3 transition-all">
-                Sync Updates <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
 
           </div>
         </main>
