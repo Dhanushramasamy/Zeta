@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2, ArrowLeft, Eye, ExternalLink, X, MessageSquare, Hash, Search, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { Send, User, Bot, Loader2, ArrowLeft, Eye, ExternalLink, X, MessageSquare, Hash, Search, AlertCircle, CheckCircle2, Clock, ClipboardList, Check } from 'lucide-react';
 import Link from 'next/link';
 import { Sidebar } from '@/components/Sidebar';
 
@@ -138,6 +138,11 @@ export default function ChatPage() {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const clientDateStr = new Date().toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+    });
 
     // Issue Details Modal State
     const [selectedIssue, setSelectedIssue] = useState<any>(null);
@@ -148,6 +153,9 @@ export default function ChatPage() {
     const [availableIssues, setAvailableIssues] = useState<Issue[]>([]);
     const [showIssueSelect, setShowIssueSelect] = useState(false);
     const [issueSearch, setIssueSearch] = useState('');
+
+    // Status Update Mode
+    const [statusUpdateMode, setStatusUpdateMode] = useState(false);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -186,7 +194,11 @@ export default function ChatPage() {
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: [...messages, userMessage] }),
+                body: JSON.stringify({ 
+                    messages: [...messages, userMessage],
+                    statusUpdateMode,
+                    clientDateStr,
+                }),
             });
 
             if (!res.ok) throw new Error('Failed to send message');
@@ -202,13 +214,14 @@ export default function ChatPage() {
 
     const handleToolConfirmation = async (toolCall: ToolCall) => {
         const args = JSON.parse(toolCall.function.arguments);
-        let type: 'comment' | 'create_issue' | 'create_sub_issue' | 'update_status' | 'log_daily_work' | 'find_issue' = 'comment';
+        let type: 'comment' | 'create_issue' | 'create_sub_issue' | 'update_status' | 'log_daily_work' | 'find_issue' | 'update_status_ticket' = 'comment';
 
         if (toolCall.function.name === 'create_issue') type = 'create_issue';
         else if (toolCall.function.name === 'create_sub_issue') type = 'create_sub_issue';
         else if (toolCall.function.name === 'update_issue_status') type = 'update_status';
         else if (toolCall.function.name === 'log_daily_work') type = 'log_daily_work';
         else if (toolCall.function.name === 'find_issue') type = 'find_issue';
+        else if (toolCall.function.name === 'update_status_ticket') type = 'update_status_ticket';
 
         const action: any = {
             id: Math.random().toString(36).substr(2, 9),
@@ -216,7 +229,13 @@ export default function ChatPage() {
             reasoning: 'User requested via Chat',
         };
 
-        if (type === 'log_daily_work') {
+        if (type === 'update_status_ticket') {
+            action.statusTicketId = args.statusTicketId;
+            action.logType = args.logType; // 'planned' or 'completed'
+            action.items = args.items; // Array of items to add
+            action.workTickets = args.workTickets; // Referenced work tickets
+            action.targetDate = clientDateStr; // Use user's local date, not server date
+        } else if (type === 'log_daily_work') {
             action.description = args.description;
             action.clientName = args.clientName;
             action.logType = args.logType || 'completed'; // Default to 'completed'
@@ -264,7 +283,7 @@ export default function ChatPage() {
                 const followUpRes = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: [...messages, toolMessage] }),
+                    body: JSON.stringify({ messages: [...messages, toolMessage], statusUpdateMode, clientDateStr }),
                 });
                 const followUpData = await followUpRes.json();
                 if (followUpData.message) {
@@ -350,7 +369,7 @@ export default function ChatPage() {
 
                     {/* Chat Header */}
                     <header className="px-8 py-6 flex items-center gap-4 border-b border-gray-100 bg-white/80 backdrop-blur-md z-10">
-                        <div className="w-10 h-10 relative flex items-center justify-center">
+                        <div className="w-12 h-12 relative flex items-center justify-center">
                             <img
                                 src="/zeta.png"
                                 alt="Zeta"
@@ -396,24 +415,76 @@ export default function ChatPage() {
 
                                     {msg.tool_calls && (
                                         <div className="mt-4 space-y-3">
-                                            {msg.tool_calls.map((tool, toolIdx) => (
-                                                <div key={toolIdx} className="bg-white/50 rounded-2xl p-4 border border-gray-100 text-sm">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-                                                        <p className="font-bold text-gray-900">Action Required</p>
+                                            {msg.tool_calls.map((tool, toolIdx) => {
+                                                const args = JSON.parse(tool.function.arguments);
+                                                const actionName = tool.function.name;
+                                                
+                                                // Friendly action descriptions
+                                                const getActionDescription = () => {
+                                                    switch (actionName) {
+                                                        case 'update_status_ticket':
+                                                            return `Update ${args.statusTicketId} with ${args.logType} items`;
+                                                        case 'log_daily_work':
+                                                            return `Log ${args.logType} work for ${args.issueId}`;
+                                                        case 'create_issue':
+                                                            return `Create issue: ${args.title}`;
+                                                        case 'create_sub_issue':
+                                                            return `Create sub-issue under ${args.parentIssueId}`;
+                                                        case 'post_comment':
+                                                            return `Comment on ${args.issueId}`;
+                                                        case 'update_issue_status':
+                                                            return `Change ${args.issueId} to ${args.stateId}`;
+                                                        case 'find_issue':
+                                                            return `Search for: ${args.query}`;
+                                                        default:
+                                                            return actionName.replace(/_/g, ' ');
+                                                    }
+                                                };
+
+                                                const getActionIcon = () => {
+                                                    switch (actionName) {
+                                                        case 'update_status_ticket':
+                                                            return <ClipboardList className="h-4 w-4" />;
+                                                        case 'create_issue':
+                                                        case 'create_sub_issue':
+                                                            return <MessageSquare className="h-4 w-4" />;
+                                                        default:
+                                                            return <Check className="h-4 w-4" />;
+                                                    }
+                                                };
+
+                                                return (
+                                                    <div key={toolIdx} className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-4 border border-gray-200 text-sm shadow-sm">
+                                                        <div className="flex items-start justify-between gap-3 mb-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                                                                    {getActionIcon()}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-bold text-gray-900 text-sm">{getActionDescription()}</p>
+                                                                    <p className="text-xs text-gray-400 capitalize">{actionName.replace(/_/g, ' ')}</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse flex-shrink-0 mt-2" />
+                                                        </div>
+                                                        
+                                                        {/* Show key details based on action type */}
+                                                        {args.description && (
+                                                            <div className="bg-gray-100/50 p-3 rounded-xl mb-3 text-gray-600 text-xs line-clamp-3">
+                                                                {args.description}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        <button
+                                                            onClick={() => handleToolConfirmation(tool)}
+                                                            className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all shadow-lg shadow-gray-900/10 hover:shadow-xl flex items-center justify-center gap-2"
+                                                        >
+                                                            <Check className="h-4 w-4" />
+                                                            Apply
+                                                        </button>
                                                     </div>
-                                                    <p className="font-mono text-xs text-orange-500 mb-3 uppercase tracking-wider">{tool.function.name}</p>
-                                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 overflow-x-auto mb-4 text-gray-600 font-mono text-xs">
-                                                        {JSON.stringify(JSON.parse(tool.function.arguments), null, 2)}
-                                                    </div>
-                                                    <button
-                                                        onClick={() => handleToolConfirmation(tool)}
-                                                        className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all shadow-lg shadow-gray-900/10 hover:shadow-xl"
-                                                    >
-                                                        Confirm & Execute
-                                                    </button>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -521,13 +592,25 @@ export default function ChatPage() {
                                     <Hash className="h-5 w-5" />
                                 </button>
 
+                                {/* Status Update Mode Toggle */}
+                                <button
+                                    onClick={() => setStatusUpdateMode(!statusUpdateMode)}
+                                    className={`flex-shrink-0 p-3 rounded-full transition-all ${statusUpdateMode ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+                                    title="Status Update Mode - Update ticket description"
+                                >
+                                    <ClipboardList className="h-5 w-5" />
+                                </button>
+
                                 <div className="relative flex-1">
                                     <input
                                         type="text"
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                                        placeholder="Type your request here... (e.g. 'Update [LIN-123] status')"
+                                        placeholder={statusUpdateMode 
+                                            ? "Describe your work log entry..." 
+                                            : "Type your request here... (e.g. 'Update [LIN-123] status')"
+                                        }
                                         className="w-full pl-3 pr-14 py-4 bg-transparent border-none text-gray-900 placeholder-gray-400 focus:ring-0 transition-all font-medium"
                                         disabled={isLoading}
                                     />

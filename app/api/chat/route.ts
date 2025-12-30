@@ -89,18 +89,29 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     {
         type: 'function',
         function: {
-            name: 'log_daily_work',
-            description: 'Log daily work to the Weekly Status Ticket. Updates today\'s day section (Day 1-5) with planned or completed items.',
+            name: 'update_status_ticket',
+            description: 'Update a Status Update ticket description with planned or completed work items for today. The status ticket is identified by having "Status Update" in its title OR explicitly mentioned with "update to [TICKET-ID]". This updates the DESCRIPTION of the ticket, NOT a comment.',
             parameters: {
                 type: 'object',
                 properties: {
-                    description: { type: 'string', description: 'Description of the work' },
-                    logType: { type: 'string', enum: ['planned', 'completed'], description: 'Whether this is a planned item or completed work. Default: completed' },
-                    clientName: { type: 'string', description: 'The client name (Divank, Insight-Ally, Acolyte). Infer from context if possible.' },
-                    issueId: { type: 'string', description: 'Optional: ID of the existing issue worked on (e.g. LIN-123)' },
-                    newIssueTitle: { type: 'string', description: 'Optional: Title for a NEW issue to create and link.' },
+                    statusTicketId: { type: 'string', description: 'The ID of the status update ticket (e.g., IA-232)' },
+                    logType: { 
+                        type: 'string', 
+                        enum: ['planned', 'completed'],
+                        description: 'Whether these items are planned (A section) or completed (B section)' 
+                    },
+                    items: { 
+                        type: 'array', 
+                        items: { type: 'string' },
+                        description: 'Array of work items to add to the description' 
+                    },
+                    workTickets: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Optional array of work ticket IDs referenced in the items (e.g., ["IA-234", "IA-225"])'
+                    }
                 },
-                required: ['description', 'clientName'],
+                required: ['statusTicketId', 'logType', 'items'],
             },
         },
     },
@@ -108,7 +119,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 
 export async function POST(request: Request) {
     try {
-        const { messages: rawMessages } = (await request.json()) as { messages: any[] };
+        const { messages: rawMessages, statusUpdateMode = false, clientDateStr } = (await request.json()) as { messages: any[], statusUpdateMode?: boolean, clientDateStr?: string };
 
         // Helper to sanitize messages: ensure every tool_call in assistant messages has a corresponding tool response
         const sanitizeMessages = (msgs: any[]) => {
@@ -207,12 +218,38 @@ Description: ${i.description || 'No description'}
 
         const usersContext = users.map(u => `${u.name} (@${u.displayName})`).join(', ');
 
+        // Build status update mode instructions
+        const statusUpdateInstructions = statusUpdateMode ? `
+**🔵 STATUS UPDATE MODE IS ACTIVE**
+When the user mentions work items, you should use the 'update_status_ticket' tool to update a Status Update ticket's DESCRIPTION (not comment).
+
+How to identify the Status Update ticket:
+1. User explicitly says "update to [TICKET-ID]" or "add to [TICKET-ID]"
+2. Ticket has "Status Update" in its title
+
+The other mentioned tickets are work tickets that should be referenced in the items.
+
+${clientDateStr ? `IMPORTANT: The user's local date is "${clientDateStr}". When updating the status ticket, update the Day section that matches this date.` : ''}
+
+The description format uses:
+- 🧩Day X: [Date]
+- A. Planned items (for planned work)
+- B. Completed items (for completed work)
+
+When user says something like "[IA-234] [IA-225] update this to [IA-232] - completed the API work":
+- IA-232 is the status update ticket
+- IA-234, IA-225 are work tickets
+- Add items mentioning the work tickets under the appropriate section
+
+ALWAYS use 'update_status_ticket' tool in status update mode.
+` : '';
+
         const systemMessage = {
             role: 'system',
             content: `You are Zeta, the premium personal project management assistant for Dhanush. 
       
 Your goal is to help Dhanush manage his tickets, track mentions, and update his work efficiently.
-
+${statusUpdateInstructions}
 ${explicitIssuesContext ? `**IMPORTANT: DHANUSH HAS SPECIFICALLY MENTIONED THESE ISSUES. FOCUS YOUR RESPONSE ON THESE:**
 ${explicitIssuesContext}
 ---
@@ -238,13 +275,8 @@ ${usersContext}
 - Use 'create_issue' to start new tasks.
 - Use 'post_comment' to add updates to existing tickets.
 - Use 'update_issue_status' to change the state of a ticket.
-- Use 'log_daily_work' when Dhanush interacts about "daily updates" or "logging work".
-    - NOTE: This ONLY updates the Weekly Status Ticket description. It does NOT automatically comment on or close the dev ticket.
-    - If Dhanush says he "finished" or "completed" a specific ticket, you MUST ALSO call 'update_issue_status' (to Done) or 'post_comment' separately.
-    - If he worked on a known issue, pass 'issueId'.
-    - If he worked on a NEW task, pass 'newIssueTitle' (Zeta will create it automatically).
-    - Always infer the 'clientName' (Divank, Insight-Ally, Acolyte) if possible, or ask.
-- ALWAYS use tool calls for these actions. Combos are encouraged (e.g. log_daily_work + update_issue_status).
+- Use 'update_status_ticket' to update a Status Update ticket's description with planned/completed items.
+- ALWAYS use tool calls for these actions. Combos are encouraged (e.g. create_sub_issue + update_issue_status).
 `,
         };
 

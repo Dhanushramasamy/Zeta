@@ -14,14 +14,14 @@ export default function LandingPage() {
         {/* Header */}
         <header className="flex items-center justify-between py-8 px-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 relative flex items-center justify-center">
+            <div className="w-16 h-16 relative flex items-center justify-center">
               <img
                 src="/zeta.png"
                 alt="Zeta"
                 className="w-full h-full object-contain"
               />
             </div>
-            <h1 className="text-2xl font-black bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent tracking-widest">
+            <h1 className="text-3xl font-black bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent tracking-widest">
               ZETA
             </h1>
           </div>

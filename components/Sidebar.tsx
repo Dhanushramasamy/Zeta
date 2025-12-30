@@ -15,11 +15,11 @@ export function Sidebar({ }: SidebarProps) {
         <aside className="w-24 bg-[#1E1E2E] rounded-[40px] shadow-2xl shadow-blue-900/10 flex flex-col items-center py-10 flex-shrink-0 text-white justify-between">
             <div className="flex flex-col items-center gap-10">
                 {/* Brand */}
-                <Link href="/" className="w-12 h-12 relative flex items-center justify-center transition-transform hover:scale-110">
+                <Link href="/" className="w-14 h-14 relative flex items-center justify-center transition-transform hover:scale-110">
                     <img
                         src="/zeta.png"
                         alt="Zeta"
-                        className="w-12 h-12 object-contain"
+                        className="w-14 h-14 object-contain"
                     />
                 </Link>
 

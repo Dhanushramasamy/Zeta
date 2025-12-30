@@ -42,7 +42,7 @@ export default function WorkflowModals({ type, onClose, onSuccess }: WorkflowMod
             <div className="bg-white border border-gray-100 rounded-[32px] w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
                 <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                     <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                        <div className="w-10 h-10 relative flex items-center justify-center">
+                        <div className="w-12 h-12 relative flex items-center justify-center">
                             <img
                                 src="/zeta.png"
                                 alt="Zeta"
