@@ -12,13 +12,19 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: 'function',
         function: {
             name: 'create_issue',
-            description: 'Create a new standalone issue in Linear',
+            description: 'Create a new standalone issue in Linear. Prefer providing status/state, project, priority, milestone, due date, and labels when possible. If missing, ask the user for the missing fields in ONE consolidated question.',
             parameters: {
                 type: 'object',
                 properties: {
                     title: { type: 'string', description: 'The title of the issue' },
                     description: { type: 'string', description: 'The description of the issue' },
                     teamId: { type: 'string', description: 'The team ID (optional, will default if not provided)' },
+                    stateId: { type: 'string', description: 'Workflow state ID (status) to set for the issue' },
+                    projectId: { type: 'string', description: 'Project ID to assign' },
+                    priority: { type: 'number', description: 'Priority (Linear numeric priority). Use 1=Urgent, 2=High, 3=Medium, 4=Low when possible.' },
+                    milestoneId: { type: 'string', description: 'Milestone/Cycle ID to assign (cycles are treated as milestones)' },
+                    dueDate: { type: 'string', description: 'Due date in YYYY-MM-DD format' },
+                    labelIds: { type: 'array', items: { type: 'string' }, description: 'Label IDs to apply' },
                 },
                 required: ['title', 'description'],
             },
@@ -119,7 +125,12 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 
 export async function POST(request: Request) {
     try {
-        const { messages: rawMessages, statusUpdateMode = false, clientDateStr } = (await request.json()) as { messages: any[], statusUpdateMode?: boolean, clientDateStr?: string };
+        const { messages: rawMessages, statusUpdateMode = false, clientDateStr, chatMode = 'general' } = (await request.json()) as {
+            messages: any[];
+            statusUpdateMode?: boolean;
+            clientDateStr?: string;
+            chatMode?: 'general' | 'create_issue' | 'update_issue' | 'issue_qa' | 'status_update';
+        };
 
         // Helper to sanitize messages: ensure every tool_call in assistant messages has a corresponding tool response
         const sanitizeMessages = (msgs: any[]) => {
@@ -244,12 +255,40 @@ When user says something like "[IA-234] [IA-225] update this to [IA-232] - compl
 ALWAYS use 'update_status_ticket' tool in status update mode.
 ` : '';
 
+        const createIssueModeInstructions = chatMode === 'create_issue' ? `
+**🟣 CREATE ISSUE MODE**
+Focus on creating a new Linear issue. Before calling 'create_issue', you MUST collect:
+- Status (state)
+- Project
+- Priority
+- Milestone/Cycle
+- Due date
+- Labels
+If any are missing, ask ONE consolidated question listing the missing fields. Do not call the tool until user answers.
+` : '';
+
+        const updateIssueModeInstructions = chatMode === 'update_issue' ? `
+**🟠 UPDATE ISSUE MODE**
+Focus on updating an existing issue. Prefer:
+- 'update_issue_status' when the user wants status change
+- 'post_comment' only if the user explicitly asks to comment
+If the user did not provide an issue id, use 'find_issue' first.
+` : '';
+
+        const issueQaModeInstructions = chatMode === 'issue_qa' ? `
+**🟢 ASK ABOUT ISSUE MODE**
+Focus on answering questions about the mentioned issue(s) using the provided context. Avoid tool calls unless the user explicitly requests an action (create/update/comment).
+` : '';
+
         const systemMessage = {
             role: 'system',
             content: `You are Zeta, the premium personal project management assistant for Dhanush. 
       
 Your goal is to help Dhanush manage his tickets, track mentions, and update his work efficiently.
 ${statusUpdateInstructions}
+${createIssueModeInstructions}
+${updateIssueModeInstructions}
+${issueQaModeInstructions}
 ${explicitIssuesContext ? `**IMPORTANT: DHANUSH HAS SPECIFICALLY MENTIONED THESE ISSUES. FOCUS YOUR RESPONSE ON THESE:**
 ${explicitIssuesContext}
 ---
@@ -270,6 +309,14 @@ ${usersContext}
    - Group information logically (by Status, Priority, or Project)
    - Keep it concise. Use bullet points.
 4. **Issue References**: Always use identifiers like [LIN-123].
+5. **Creating Issues Requires Details**: When the user asks to create a new issue, you MUST collect these fields before calling 'create_issue':
+   - Status (state)
+   - Project
+   - Priority
+   - Milestone/Cycle
+   - Due date
+   - Labels
+   If any are missing, ask ONE consolidated question that lists the missing fields and gives short options/examples for each. Do not call 'create_issue' until the user answers.
 
 **Actions:**
 - Use 'create_issue' to start new tasks.

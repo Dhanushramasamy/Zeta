@@ -20,12 +20,37 @@ interface Message {
     tool_call_id?: string;
 }
 
+type ChatMode = 'general' | 'create_issue' | 'update_issue' | 'issue_qa' | 'status_update';
+
 interface Issue {
     id: string;
     identifier: string;
     title: string;
     project_name?: string;
     state?: string;
+}
+
+interface Project {
+    id: string;
+    name: string;
+}
+
+interface Label {
+    id: string;
+    name: string;
+    color?: string;
+}
+
+interface WorkflowState {
+    id: string;
+    name: string;
+    type?: string;
+}
+
+interface Milestone {
+    id: string;
+    name: string;
+    targetDate?: string;
 }
 
 // Hover Card Component
@@ -134,7 +159,21 @@ function IssueHoverCard({ identifier, onClick }: { identifier: string; onClick: 
 }
 
 export default function ChatPage() {
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [chatMode, setChatMode] = useState<ChatMode>('general');
+    const [threads, setThreads] = useState<Record<ChatMode, Message[]>>({
+        general: [],
+        create_issue: [],
+        update_issue: [],
+        issue_qa: [],
+        status_update: [],
+    });
+    const messages = threads[chatMode];
+    const setMessages = (updater: (prev: Message[]) => Message[]) => {
+        setThreads((prev) => ({
+            ...prev,
+            [chatMode]: updater(prev[chatMode]),
+        }));
+    };
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -154,8 +193,17 @@ export default function ChatPage() {
     const [showIssueSelect, setShowIssueSelect] = useState(false);
     const [issueSearch, setIssueSearch] = useState('');
 
-    // Status Update Mode
-    const [statusUpdateMode, setStatusUpdateMode] = useState(false);
+    // Status Update Mode (derived from chatMode)
+    const statusUpdateMode = chatMode === 'status_update';
+
+    // Create Issue metadata
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [labels, setLabels] = useState<Label[]>([]);
+    const [states, setStates] = useState<WorkflowState[]>([]);
+    const [milestones, setMilestones] = useState<Milestone[]>([]);
+
+    // Draft values per create_issue tool call id
+    const [createIssueDrafts, setCreateIssueDrafts] = useState<Record<string, any>>({});
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -182,6 +230,32 @@ export default function ChatPage() {
         fetchIssues();
     }, []);
 
+    useEffect(() => {
+        const fetchMeta = async () => {
+            try {
+                const [pRes, lRes, sRes, mRes] = await Promise.all([
+                    fetch('/api/projects'),
+                    fetch('/api/labels'),
+                    fetch('/api/states'),
+                    fetch('/api/milestones'),
+                ]);
+                const [pData, lData, sData, mData] = await Promise.all([
+                    pRes.json(),
+                    lRes.json(),
+                    sRes.json(),
+                    mRes.json(),
+                ]);
+                setProjects(pData.projects || []);
+                setLabels(lData.labels || []);
+                setStates(sData.states || []);
+                setMilestones(mData.milestones || []);
+            } catch (e) {
+                console.error('Failed to fetch create issue metadata', e);
+            }
+        };
+        fetchMeta();
+    }, []);
+
     const sendMessage = async () => {
         if (!input.trim()) return;
 
@@ -198,6 +272,7 @@ export default function ChatPage() {
                     messages: [...messages, userMessage],
                     statusUpdateMode,
                     clientDateStr,
+                    chatMode,
                 }),
             });
 
@@ -258,6 +333,33 @@ export default function ChatPage() {
             action.stateId = args.stateId;
         }
 
+        // Merge draft fields for create_issue
+        if (type === 'create_issue') {
+            const draft = createIssueDrafts[toolCall.id] || {};
+            action.title = args.title;
+            action.description = args.description;
+            action.teamId = args.teamId || draft.teamId;
+            action.stateId = draft.stateId || args.stateId;
+            action.projectId = draft.projectId || args.projectId;
+            action.priority = typeof draft.priority === 'number' ? draft.priority : args.priority;
+            action.milestoneId = draft.milestoneId || args.milestoneId;
+            action.dueDate = draft.dueDate || args.dueDate;
+            action.labelIds = draft.labelIds || args.labelIds;
+
+            // Enforce required fields for your workflow
+            const missing: string[] = [];
+            if (!action.stateId) missing.push('Status');
+            if (!action.projectId) missing.push('Project');
+            if (!action.priority) missing.push('Priority');
+            if (!action.milestoneId) missing.push('Milestone');
+            if (!action.dueDate) missing.push('Due date');
+            if (!action.labelIds || action.labelIds.length === 0) missing.push('Labels');
+            if (missing.length) {
+                alert(`Please select: ${missing.join(', ')}`);
+                return;
+            }
+        }
+
         try {
             const res = await fetch('/api/execute', {
                 method: 'POST',
@@ -283,7 +385,7 @@ export default function ChatPage() {
                 const followUpRes = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: [...messages, toolMessage], statusUpdateMode, clientDateStr }),
+                    body: JSON.stringify({ messages: [...messages, toolMessage], statusUpdateMode, clientDateStr, chatMode }),
                 });
                 const followUpData = await followUpRes.json();
                 if (followUpData.message) {
@@ -383,6 +485,29 @@ export default function ChatPage() {
                                 Online Assistant
                             </div>
                         </div>
+
+                        {/* Case Tabs */}
+                        <div className="ml-auto flex items-center gap-2">
+                            {([
+                                { id: 'general', label: 'General' },
+                                { id: 'create_issue', label: 'Create Issue' },
+                                { id: 'update_issue', label: 'Update Issue' },
+                                { id: 'issue_qa', label: 'Ask about Issue' },
+                                { id: 'status_update', label: 'Status Update' },
+                            ] as { id: ChatMode; label: string }[]).map((t) => (
+                                <button
+                                    key={t.id}
+                                    onClick={() => setChatMode(t.id)}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                                        chatMode === t.id
+                                            ? 'bg-gray-900 text-white border-gray-900'
+                                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
                     </header>
 
                     {/* Chat Messages */}
@@ -474,15 +599,146 @@ export default function ChatPage() {
                                                                 {args.description}
                                                             </div>
                                                         )}
+
+                                                        {/* Create Issue Selectors */}
+                                                        {actionName === 'create_issue' && (
+                                                            <div className="space-y-3 mb-3">
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                    <div>
+                                                                        <div className="text-[11px] font-bold text-gray-500 mb-1">Status</div>
+                                                                        <select
+                                                                            className="w-full text-xs rounded-xl border border-gray-200 bg-white px-3 py-2"
+                                                                            value={createIssueDrafts[tool.id]?.stateId || ''}
+                                                                            onChange={(e) =>
+                                                                                setCreateIssueDrafts((prev) => ({
+                                                                                    ...prev,
+                                                                                    [tool.id]: { ...(prev[tool.id] || {}), stateId: e.target.value },
+                                                                                }))
+                                                                            }
+                                                                        >
+                                                                            <option value="">Select status…</option>
+                                                                            {states.map((s) => (
+                                                                                <option key={s.id} value={s.id}>
+                                                                                    {s.name}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="text-[11px] font-bold text-gray-500 mb-1">Project</div>
+                                                                        <select
+                                                                            className="w-full text-xs rounded-xl border border-gray-200 bg-white px-3 py-2"
+                                                                            value={createIssueDrafts[tool.id]?.projectId || ''}
+                                                                            onChange={(e) =>
+                                                                                setCreateIssueDrafts((prev) => ({
+                                                                                    ...prev,
+                                                                                    [tool.id]: { ...(prev[tool.id] || {}), projectId: e.target.value },
+                                                                                }))
+                                                                            }
+                                                                        >
+                                                                            <option value="">Select project…</option>
+                                                                            {projects.map((p) => (
+                                                                                <option key={p.id} value={p.id}>
+                                                                                    {p.name}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                    <div>
+                                                                        <div className="text-[11px] font-bold text-gray-500 mb-1">Priority</div>
+                                                                        <select
+                                                                            className="w-full text-xs rounded-xl border border-gray-200 bg-white px-3 py-2"
+                                                                            value={createIssueDrafts[tool.id]?.priority ?? ''}
+                                                                            onChange={(e) =>
+                                                                                setCreateIssueDrafts((prev) => ({
+                                                                                    ...prev,
+                                                                                    [tool.id]: {
+                                                                                        ...(prev[tool.id] || {}),
+                                                                                        priority: e.target.value ? Number(e.target.value) : undefined,
+                                                                                    },
+                                                                                }))
+                                                                            }
+                                                                        >
+                                                                            <option value="">Select priority…</option>
+                                                                            <option value="1">Urgent</option>
+                                                                            <option value="2">High</option>
+                                                                            <option value="3">Medium</option>
+                                                                            <option value="4">Low</option>
+                                                                        </select>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="text-[11px] font-bold text-gray-500 mb-1">Milestone</div>
+                                                                        <select
+                                                                            className="w-full text-xs rounded-xl border border-gray-200 bg-white px-3 py-2"
+                                                                            value={createIssueDrafts[tool.id]?.milestoneId || ''}
+                                                                            onChange={(e) =>
+                                                                                setCreateIssueDrafts((prev) => ({
+                                                                                    ...prev,
+                                                                                    [tool.id]: { ...(prev[tool.id] || {}), milestoneId: e.target.value },
+                                                                                }))
+                                                                            }
+                                                                        >
+                                                                            <option value="">Select milestone…</option>
+                                                                            {milestones.map((m) => (
+                                                                                <option key={m.id} value={m.id}>
+                                                                                    {m.name}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                    <div>
+                                                                        <div className="text-[11px] font-bold text-gray-500 mb-1">Due date</div>
+                                                                        <input
+                                                                            type="date"
+                                                                            className="w-full text-xs rounded-xl border border-gray-200 bg-white px-3 py-2"
+                                                                            value={createIssueDrafts[tool.id]?.dueDate || ''}
+                                                                            onChange={(e) =>
+                                                                                setCreateIssueDrafts((prev) => ({
+                                                                                    ...prev,
+                                                                                    [tool.id]: { ...(prev[tool.id] || {}), dueDate: e.target.value },
+                                                                                }))
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="text-[11px] font-bold text-gray-500 mb-1">Labels</div>
+                                                                        <select
+                                                                            multiple
+                                                                            className="w-full text-xs rounded-xl border border-gray-200 bg-white px-3 py-2 h-[40px]"
+                                                                            value={createIssueDrafts[tool.id]?.labelIds || []}
+                                                                            onChange={(e) => {
+                                                                                const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
+                                                                                setCreateIssueDrafts((prev) => ({
+                                                                                    ...prev,
+                                                                                    [tool.id]: { ...(prev[tool.id] || {}), labelIds: selected },
+                                                                                }));
+                                                                            }}
+                                                                        >
+                                                                            {labels.map((l) => (
+                                                                                <option key={l.id} value={l.id}>
+                                                                                    {l.name}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                    </div>
+                                                    </div>
+                                                        )}
                                                         
-                                                        <button
-                                                            onClick={() => handleToolConfirmation(tool)}
+                                                    <button
+                                                        onClick={() => handleToolConfirmation(tool)}
                                                             className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all shadow-lg shadow-gray-900/10 hover:shadow-xl flex items-center justify-center gap-2"
-                                                        >
+                                                    >
                                                             <Check className="h-4 w-4" />
                                                             Apply
-                                                        </button>
-                                                    </div>
+                                                    </button>
+                                                </div>
                                                 );
                                             })}
                                         </div>
@@ -594,7 +850,7 @@ export default function ChatPage() {
 
                                 {/* Status Update Mode Toggle */}
                                 <button
-                                    onClick={() => setStatusUpdateMode(!statusUpdateMode)}
+                                    onClick={() => setChatMode(chatMode === 'status_update' ? 'general' : 'status_update')}
                                     className={`flex-shrink-0 p-3 rounded-full transition-all ${statusUpdateMode ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
                                     title="Status Update Mode - Update ticket description"
                                 >

@@ -41,7 +41,14 @@ export async function POST(request: Request) {
                 } else if (action.type === 'create_issue') {
                     const result = await createIssue({
                         title: action.title,
-                        description: action.description
+                        description: action.description,
+                        teamId: action.teamId,
+                        stateId: action.stateId,
+                        projectId: action.projectId,
+                        priority: action.priority,
+                        milestoneId: action.milestoneId,
+                        dueDate: action.dueDate,
+                        labelIds: action.labelIds
                     });
 
                     // Get the created issue identifier for the response

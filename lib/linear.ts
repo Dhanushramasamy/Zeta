@@ -40,6 +40,13 @@ export interface LinearProject {
     state: string;
 }
 
+export interface LinearMilestone {
+    id: string;
+    name: string;
+    description?: string;
+    targetDate?: string;
+}
+
 export async function getIssuesFromSupabase(projectName?: string): Promise<LinearIssue[]> {
     let query = supabase
         .from('linear_issues')
@@ -209,6 +216,25 @@ export async function getLabels() {
     }));
 }
 
+export async function getMilestones(): Promise<LinearMilestone[]> {
+    const { data: milestones, error } = await supabase
+        .from('linear_milestones')
+        .select('id, name, description, target_date')
+        .order('target_date', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching milestones from Supabase:', error);
+        return [];
+    }
+
+    return (milestones || []).map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        targetDate: m.target_date,
+    }));
+}
+
 export interface CreateIssueParams {
     title: string;
     description?: string;
@@ -220,6 +246,7 @@ export interface CreateIssueParams {
     parentId?: string; // For sub-issues
     stateId?: string; // Initial state
     projectId?: string;
+    milestoneId?: string; // Cycle/Milestone in Linear
 }
 
 export async function createIssue({
@@ -232,7 +259,8 @@ export async function createIssue({
     dueDate,
     parentId,
     stateId,
-    projectId
+    projectId,
+    milestoneId
 }: CreateIssueParams) {
     // If no teamId provided, fetch the first team the user is in
     let targetTeamId = teamId;
@@ -269,6 +297,12 @@ export async function createIssue({
     // Add project if provided
     if (projectId) {
         issuePayload.projectId = projectId;
+    }
+
+    // Add milestone/cycle if provided
+    if (milestoneId) {
+        // Linear uses cycleId for cycles; milestoneId naming kept for UI clarity
+        issuePayload.cycleId = milestoneId;
     }
 
     return await linearClient.createIssue(issuePayload);
