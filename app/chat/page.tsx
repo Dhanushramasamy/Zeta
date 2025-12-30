@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2, ArrowLeft, Eye, ExternalLink, X, MessageSquare, Flame, Hash, Search, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { Send, User, Bot, Loader2, ArrowLeft, Eye, ExternalLink, X, MessageSquare, Hash, Search, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { Sidebar } from '@/components/Sidebar';
 
@@ -350,8 +350,12 @@ export default function ChatPage() {
 
                     {/* Chat Header */}
                     <header className="px-8 py-6 flex items-center gap-4 border-b border-gray-100 bg-white/80 backdrop-blur-md z-10">
-                        <div className="w-10 h-10 bg-orange-100 rounded-2xl flex items-center justify-center">
-                            <Flame className="h-5 w-5 text-orange-600" />
+                        <div className="w-10 h-10 relative flex items-center justify-center">
+                            <img
+                                src="/zeta.png"
+                                alt="Zeta"
+                                className="w-full h-full object-contain"
+                            />
                         </div>
                         <div>
                             <h1 className="text-xl font-bold text-gray-900">ZETA Chat</h1>

@@ -311,9 +311,15 @@ export async function createSubIssue(
         }
     }
 
+    // Resolve the team ID
+    const teamId = team?.id;
+    if (!teamId) {
+        throw new Error(`Parent issue ${parentIdentifier} has no team`);
+    }
+
     // Create the sub-issue
     const result = await linearClient.createIssue({
-        teamId: team?.id,
+        teamId,
         parentId: parent.id,
         title,
         description,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, X, Calendar } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 
 interface WorkflowModalsProps {
     type: 'weekly' | null;
@@ -42,8 +42,12 @@ export default function WorkflowModals({ type, onClose, onSuccess }: WorkflowMod
             <div className="bg-white border border-gray-100 rounded-[32px] w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
                 <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                     <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                        <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
-                            <Calendar className="h-5 w-5 text-pink-600" />
+                        <div className="w-10 h-10 relative flex items-center justify-center">
+                            <img
+                                src="/zeta.png"
+                                alt="Zeta"
+                                className="w-full h-full object-contain"
+                            />
                         </div>
                         Start New Week
                     </h2>

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, MessageSquare, Brain, Layout } from 'lucide-react';
+import { ArrowRight, MessageSquare, Layout } from 'lucide-react';
 
 export default function LandingPage() {
   return (
@@ -14,10 +14,14 @@ export default function LandingPage() {
         {/* Header */}
         <header className="flex items-center justify-between py-8 px-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/10 border border-orange-100">
-              <Brain className="h-6 w-6 text-orange-500" />
+            <div className="w-12 h-12 relative flex items-center justify-center">
+              <img
+                src="/zeta.png"
+                alt="Zeta"
+                className="w-full h-full object-contain"
+              />
             </div>
-            <h1 className="text-2xl font-black bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-black bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent tracking-widest">
               ZETA
             </h1>
           </div>
