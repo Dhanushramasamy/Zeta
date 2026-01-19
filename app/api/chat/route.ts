@@ -101,15 +101,15 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
                 type: 'object',
                 properties: {
                     statusTicketId: { type: 'string', description: 'The ID of the status update ticket (e.g., IA-232)' },
-                    logType: { 
-                        type: 'string', 
+                    logType: {
+                        type: 'string',
                         enum: ['planned', 'completed'],
-                        description: 'Whether these items are planned (A section) or completed (B section)' 
+                        description: 'Whether these items are planned (A section) or completed (B section)'
                     },
-                    items: { 
-                        type: 'array', 
+                    items: {
+                        type: 'array',
                         items: { type: 'string' },
-                        description: 'Array of work items to add to the description' 
+                        description: 'Array of work items to add to the description'
                     },
                     workTickets: {
                         type: 'array',
@@ -251,6 +251,20 @@ When user says something like "[IA-234] [IA-225] update this to [IA-232] - compl
 - IA-232 is the status update ticket
 - IA-234, IA-225 are work tickets
 - Add items mentioning the work tickets under the appropriate section
+
+**CRITICAL - CONTENT REPHRASING:**
+NEVER copy the user's exact words verbatim. You MUST rephrase and improve the content:
+- Transform casual/shorthand input into professional, clear work log entries
+- Fix grammar, punctuation, and sentence structure
+- Make items concise but descriptive (what was done, not just task names)
+- Keep the same meaning but express it more professionally
+- Add context where helpful (e.g., "Completed API integration for..." instead of just "API work")
+- Ensure each item is a complete, well-formed statement
+
+Example transformations:
+- User: "finished the login thing" → "Completed implementation of user authentication flow"
+- User: "fixed bug in api" → "Resolved API endpoint bug causing request failures"
+- User: "worked on IA-234 updates" → "Implemented updates for [IA-234] feature requirements"
 
 ALWAYS use 'update_status_ticket' tool in status update mode.
 ` : '';
