@@ -268,7 +268,7 @@ export default function ChatPage() {
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     messages: [...messages, userMessage],
                     statusUpdateMode,
                     clientDateStr,
@@ -346,14 +346,13 @@ export default function ChatPage() {
             action.dueDate = draft.dueDate || args.dueDate;
             action.labelIds = draft.labelIds || args.labelIds;
 
-            // Enforce required fields for your workflow
+            // Enforce required fields for your workflow (only essential ones)
             const missing: string[] = [];
             if (!action.stateId) missing.push('Status');
             if (!action.projectId) missing.push('Project');
             if (!action.priority) missing.push('Priority');
-            if (!action.milestoneId) missing.push('Milestone');
             if (!action.dueDate) missing.push('Due date');
-            if (!action.labelIds || action.labelIds.length === 0) missing.push('Labels');
+            // Milestone and Labels are optional
             if (missing.length) {
                 alert(`Please select: ${missing.join(', ')}`);
                 return;
@@ -489,21 +488,21 @@ export default function ChatPage() {
                         {/* Case Tabs */}
                         <div className="ml-auto flex items-center gap-2">
                             {([
-                                { id: 'general', label: 'General' },
-                                { id: 'create_issue', label: 'Create Issue' },
-                                { id: 'update_issue', label: 'Update Issue' },
-                                { id: 'issue_qa', label: 'Ask about Issue' },
-                                { id: 'status_update', label: 'Status Update' },
-                            ] as { id: ChatMode; label: string }[]).map((t) => (
+                                { id: 'general', label: 'General', icon: '💬' },
+                                { id: 'create_issue', label: 'Create', icon: '➕' },
+                                { id: 'update_issue', label: 'Update', icon: '✏️' },
+                                { id: 'issue_qa', label: 'Ask', icon: '❓' },
+                                { id: 'status_update', label: 'Status', icon: '📋' },
+                            ] as { id: ChatMode; label: string; icon: string }[]).map((t) => (
                                 <button
                                     key={t.id}
                                     onClick={() => setChatMode(t.id)}
-                                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                                        chatMode === t.id
-                                            ? 'bg-gray-900 text-white border-gray-900'
-                                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all flex items-center gap-1.5 ${chatMode === t.id
+                                        ? 'bg-gray-900 text-white border-gray-900'
+                                        : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                                        }`}
                                 >
+                                    <span>{t.icon}</span>
                                     {t.label}
                                 </button>
                             ))}
@@ -513,12 +512,71 @@ export default function ChatPage() {
                     {/* Chat Messages */}
                     <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-gray-50/50">
                         {messages.length === 0 && (
-                            <div className="text-center text-gray-400 mt-20">
+                            <div className="text-center mt-16 max-w-xl mx-auto">
                                 <div className="w-16 h-16 bg-white rounded-full shadow-sm border border-gray-100 flex items-center justify-center mx-auto mb-6">
                                     <Bot className="h-8 w-8 text-orange-500 opacity-50" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">Welcome Back, Dhanush!</h3>
-                                <p className="text-gray-500">I'm ready to help you track issues, log work, and stay organized.</p>
+
+                                {/* Mode-specific welcome content */}
+                                {chatMode === 'general' && (
+                                    <>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2">How can I help you today?</h3>
+                                        <p className="text-gray-500 mb-6">I can help you manage issues, track work, and stay organized.</p>
+                                        <div className="flex flex-wrap justify-center gap-2">
+                                            <button onClick={() => setInput("Create a new issue for ")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600 transition-all">📋 Create Issue</button>
+                                            <button onClick={() => setInput("Find issues related to ")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600 transition-all">🔍 Find Issue</button>
+                                            <button onClick={() => setInput("Show my urgent issues")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600 transition-all">🔴 Urgent Issues</button>
+                                            <button onClick={() => setInput("What's overdue?")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600 transition-all">⏰ Overdue</button>
+                                        </div>
+                                    </>
+                                )}
+
+                                {chatMode === 'create_issue' && (
+                                    <>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2">Let's create a new issue</h3>
+                                        <p className="text-gray-500 mb-6">Describe what you need and I'll help set it up with all the details.</p>
+                                        <div className="flex flex-wrap justify-center gap-2">
+                                            <button onClick={() => setInput("Bug report: ")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all">🐛 Bug Report</button>
+                                            <button onClick={() => setInput("Feature request: ")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-all">✨ Feature Request</button>
+                                            <button onClick={() => setInput("New task: ")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-green-50 hover:border-green-200 hover:text-green-600 transition-all">📝 New Task</button>
+                                        </div>
+                                    </>
+                                )}
+
+                                {chatMode === 'update_issue' && (
+                                    <>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2">Which issue needs updating?</h3>
+                                        <p className="text-gray-500 mb-6">Tell me the issue ID or describe what you want to update.</p>
+                                        <div className="flex flex-wrap justify-center gap-2">
+                                            <button onClick={() => setInput("Mark as done: ")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-green-50 hover:border-green-200 hover:text-green-600 transition-all">✅ Mark Done</button>
+                                            <button onClick={() => setInput("Change status of ")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-all">🔄 Change Status</button>
+                                            <button onClick={() => setInput("Add comment to ")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-600 transition-all">💬 Add Comment</button>
+                                        </div>
+                                    </>
+                                )}
+
+                                {chatMode === 'issue_qa' && (
+                                    <>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2">Ask me about your issues</h3>
+                                        <p className="text-gray-500 mb-6">I can answer questions about status, blockers, and progress.</p>
+                                        <div className="flex flex-wrap justify-center gap-2">
+                                            <button onClick={() => setInput("What are my priorities today?")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600 transition-all">📊 My Priorities</button>
+                                            <button onClick={() => setInput("Show blockers")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all">🚧 Blockers</button>
+                                            <button onClick={() => setInput("What's in progress?")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-all">🏃 In Progress</button>
+                                        </div>
+                                    </>
+                                )}
+
+                                {chatMode === 'status_update' && (
+                                    <>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2">Log your work for today</h3>
+                                        <p className="text-gray-500 mb-6">Tell me what you completed or what you're planning.</p>
+                                        <div className="flex flex-wrap justify-center gap-2">
+                                            <button onClick={() => setInput("Completed: ")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-green-50 hover:border-green-200 hover:text-green-600 transition-all">✅ Log Completed Work</button>
+                                            <button onClick={() => setInput("Planning to: ")} className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-all">📅 Plan Work</button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
 
@@ -543,7 +601,7 @@ export default function ChatPage() {
                                             {msg.tool_calls.map((tool, toolIdx) => {
                                                 const args = JSON.parse(tool.function.arguments);
                                                 const actionName = tool.function.name;
-                                                
+
                                                 // Friendly action descriptions
                                                 const getActionDescription = () => {
                                                     switch (actionName) {
@@ -592,7 +650,7 @@ export default function ChatPage() {
                                                             </div>
                                                             <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse flex-shrink-0 mt-2" />
                                                         </div>
-                                                        
+
                                                         {/* Show key details based on action type */}
                                                         {args.description && (
                                                             <div className="bg-gray-100/50 p-3 rounded-xl mb-3 text-gray-600 text-xs line-clamp-3">
@@ -727,18 +785,18 @@ export default function ChatPage() {
                                                                             ))}
                                                                         </select>
                                                                     </div>
-                                                    </div>
-                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         )}
-                                                        
-                                                    <button
-                                                        onClick={() => handleToolConfirmation(tool)}
+
+                                                        <button
+                                                            onClick={() => handleToolConfirmation(tool)}
                                                             className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all shadow-lg shadow-gray-900/10 hover:shadow-xl flex items-center justify-center gap-2"
-                                                    >
+                                                        >
                                                             <Check className="h-4 w-4" />
                                                             Apply
-                                                    </button>
-                                                </div>
+                                                        </button>
+                                                    </div>
                                                 );
                                             })}
                                         </div>
@@ -863,9 +921,13 @@ export default function ChatPage() {
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                                        placeholder={statusUpdateMode 
-                                            ? "Describe your work log entry..." 
-                                            : "Type your request here... (e.g. 'Update [LIN-123] status')"
+                                        placeholder={
+                                            chatMode === 'general' ? "Ask anything or try: 'Show my urgent issues'" :
+                                                chatMode === 'create_issue' ? "Describe the issue you want to create..." :
+                                                    chatMode === 'update_issue' ? "Enter issue ID or search, e.g. 'Mark IA-234 as done'" :
+                                                        chatMode === 'issue_qa' ? "Ask about any issue, e.g. 'What's blocking IA-234?'" :
+                                                            chatMode === 'status_update' ? "What did you work on? e.g. 'Completed API integration'" :
+                                                                "Type your request here..."
                                         }
                                         className="w-full pl-3 pr-14 py-4 bg-transparent border-none text-gray-900 placeholder-gray-400 focus:ring-0 transition-all font-medium"
                                         disabled={isLoading}
