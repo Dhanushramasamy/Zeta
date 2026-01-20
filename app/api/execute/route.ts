@@ -182,20 +182,20 @@ export async function POST(request: Request) {
                     }
 
                     const currentDescription = issue.description || '';
-                    
+
                     // Prefer client's local date (passed from UI) to avoid server timezone issues
                     const dateStr =
                         typeof action.targetDate === 'string' && action.targetDate.trim()
                             ? action.targetDate.trim()
                             : new Date().toLocaleDateString('en-US', {
-                                  month: 'long',
-                                  day: 'numeric',
-                                  year: 'numeric',
-                              });
-                    
+                                month: 'long',
+                                day: 'numeric',
+                                year: 'numeric',
+                            });
+
                     // Determine which section to target by NAME (letters A/B/C vary by day in the template)
                     const targetSectionName = action.logType === 'planned' ? 'Planned items' : 'Completed items';
-                    
+
                     // Format items as an unordered list (markdown bullets)
                     const formattedItems = action.items.map((x: string) => `- ${x}`).join('\n');
 
@@ -253,8 +253,8 @@ Rules:
 
 Options:
 ${options
-    .map((o) => `- idx=${o.idx}, header="${o.header}", preview="${o.preview.replace(/\n/g, '\\n')}"`)
-    .join('\n')}
+                                .map((o) => `- idx=${o.idx}, header="${o.header}", preview="${o.preview.replace(/\n/g, '\\n')}"`)
+                                .join('\n')}
 `;
 
                         const llmRes = await openai.chat.completions.create({
@@ -277,12 +277,14 @@ ${options
                     // 4) Deterministically append under the section (by name) inside the selected block
                     const targetBlock = blocks[targetBlockIndex];
                     // Parse headings within the day block and locate the correct section by NAME.
-                    // This keeps the template intact even when A/B/C letters vary, and supports
-                    // Linear markdown templates like "**A. Planned items**".
-                    const headingRegex = /^\s*(?:[*_]{1,3}\s*)?(?:[A-Z]|\d+)\.\s+(.+?)(?:\s*[*_]{1,3})?\s*$/gm;
+                    // Supports "A. Planned", "1. Planned", "## Planned", or just "**Planned**"
+                    const headingRegex = /^\s*(?:[*_]{1,3}\s*)?(?:(?:[A-Z]|\d+)\.|#+)?\s*(.+?)(?:\s*[*_]{1,3})?\s*$/gm;
                     const headings: { index: number; text: string; title: string; end: number }[] = [];
                     let hm: RegExpExecArray | null;
                     while ((hm = headingRegex.exec(targetBlock.blockText)) !== null) {
+                        // Filter out common non-headers if regex is too loose (optional safety)
+                        if (hm[1].trim().length < 3) continue;
+
                         headings.push({
                             index: hm.index,
                             text: hm[0],
@@ -296,7 +298,7 @@ ${options
                     if (targetHeadingIdx === -1) {
                         throw new Error(
                             `Section "${targetSectionName}" not found in the resolved Day block for "${dateStr}". ` +
-                                `Make sure the Day block contains "${targetSectionName}".`
+                            `Make sure the Day block contains "${targetSectionName}".`
                         );
                     }
 
@@ -305,11 +307,13 @@ ${options
                     const sectionStart = targetHeading.end; // end of heading line
                     const sectionEnd = nextHeading ? nextHeading.index : targetBlock.blockText.length;
 
-                    // Append items at the END of this section (right before the next heading), without trimming/removing anything.
-                    // Ensure we always start the insertion on a new line.
+                    // Append items at the END of this section
+                    // Fix: Avoid inserting double newlines which create "gaps" in the list
+                    const previousContent = targetBlock.blockText.slice(sectionStart, sectionEnd);
+                    const needsNewline = previousContent.length > 0 && !previousContent.endsWith('\n');
+
                     const insertion =
-                        (targetBlock.blockText.slice(sectionStart, sectionEnd).endsWith('\n') ? '' : '\n') +
-                        '\n' +
+                        (needsNewline ? '\n' : '') +
                         formattedItems +
                         '\n';
 
@@ -330,16 +334,16 @@ ${options
 
                     // Update the issue description
                     await linearClient.updateIssue(issue.id, { description: newDescription });
-                    
-                    results.push({ 
-                        status: 'success', 
-                        action, 
-                        data: { 
-                            issueId: issue.identifier, 
+
+                    results.push({
+                        status: 'success',
+                        action,
+                        data: {
+                            issueId: issue.identifier,
                             logType: action.logType,
                             itemsAdded: action.items.length,
                             message: `✅ Updated ${issue.identifier} with ${action.items.length} ${action.logType} item(s)`
-                        } 
+                        }
                     });
                 }
             } catch (e) {

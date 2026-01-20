@@ -115,6 +115,10 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
                         type: 'array',
                         items: { type: 'string' },
                         description: 'Optional array of work ticket IDs referenced in the items (e.g., ["IA-234", "IA-225"])'
+                    },
+                    targetDate: {
+                        type: 'string',
+                        description: 'The date for the status update in format "Month Day, Year" (e.g. "January 19, 2026"). Calculate this based on user input (e.g. "yesterday").'
                     }
                 },
                 required: ['statusTicketId', 'logType', 'items'],
@@ -296,7 +300,13 @@ Focus on answering questions about the mentioned issue(s) using the provided con
 
         const systemMessage = {
             role: 'system',
-            content: `You are Zeta, the premium personal project management assistant for Dhanush. 
+            content: `You are Zeta, the premium personal project management assistant for Dhanush.
+Current Date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+
+**CRITICAL - DATE HANDLING:**
+- All relative dates (today, yesterday, tomorrow, last Friday) MUST be calculated based on "Current Date" above.
+- If today is Monday, "yesterday" is Sunday. If today is Jan 20, "yesterday" is Jan 19.
+- You MUST output the exact calculated date for 'targetDate' fields.
       
 Your goal is to help Dhanush manage his tickets, track mentions, and update his work efficiently.
 ${statusUpdateInstructions}
@@ -346,6 +356,14 @@ NEVER copy user's exact casual words. Transform ALL content into professional la
 - "talked to client about stuff" → "Conducted client consultation"
 - "debugging rn" → "Currently investigating and debugging"
 Always preserve meaning while elevating professionalism.
+
+**CRITICAL - Work Log Formatting:**
+When a work item is related to a specific ticket, you **MUST** format the final string as:
+"[Professional Description] [TICKET-ID Ticket Title]"
+- Example: "Resolved API latency issues. [IA-234 API Performance Optimization]"
+- Example: "Updated checkout flow UI. [IA-250 Checkout Redesign]"
+- Do NOT put the ticket at the start. It must be at the END.
+- Ensure the Ticket Title is included, not just the ID.
 
 **Actions:**
 - Use 'create_issue' to start new tasks.

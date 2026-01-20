@@ -176,6 +176,7 @@ export default function ChatPage() {
     };
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingTools, setLoadingTools] = useState<Record<string, boolean>>({});
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const clientDateStr = new Date().toLocaleDateString('en-US', {
         month: 'long',
@@ -288,6 +289,7 @@ export default function ChatPage() {
     };
 
     const handleToolConfirmation = async (toolCall: ToolCall) => {
+        setLoadingTools(prev => ({ ...prev, [toolCall.id]: true }));
         const args = JSON.parse(toolCall.function.arguments);
         let type: 'comment' | 'create_issue' | 'create_sub_issue' | 'update_status' | 'log_daily_work' | 'find_issue' | 'update_status_ticket' = 'comment';
 
@@ -309,7 +311,7 @@ export default function ChatPage() {
             action.logType = args.logType; // 'planned' or 'completed'
             action.items = args.items; // Array of items to add
             action.workTickets = args.workTickets; // Referenced work tickets
-            action.targetDate = clientDateStr; // Use user's local date, not server date
+            action.targetDate = args.targetDate || clientDateStr; // Prioritize LLM's date (for "yesterday"), fallback to today
         } else if (type === 'log_daily_work') {
             action.description = args.description;
             action.clientName = args.clientName;
@@ -404,6 +406,8 @@ export default function ChatPage() {
                 content: `Failed to execute action: ${error instanceof Error ? error.message : 'Unknown error'}`
             };
             setMessages(prev => [...prev, errorMessage]);
+        } finally {
+            setLoadingTools(prev => ({ ...prev, [toolCall.id]: false }));
         }
     };
 
@@ -790,11 +794,26 @@ export default function ChatPage() {
                                                         )}
 
                                                         <button
-                                                            onClick={() => handleToolConfirmation(tool)}
-                                                            className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all shadow-lg shadow-gray-900/10 hover:shadow-xl flex items-center justify-center gap-2"
+                                                            onClick={(e) => {
+                                                                const btn = e.currentTarget;
+                                                                // Prevent double clicks visually and logically
+                                                                if (loadingTools[tool.id]) return;
+                                                                handleToolConfirmation(tool);
+                                                            }}
+                                                            disabled={loadingTools[tool.id]}
+                                                            className={`w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all shadow-lg shadow-gray-900/10 hover:shadow-xl flex items-center justify-center gap-2 ${loadingTools[tool.id] ? 'opacity-80 cursor-wait' : ''}`}
                                                         >
-                                                            <Check className="h-4 w-4" />
-                                                            Apply
+                                                            {loadingTools[tool.id] ? (
+                                                                <>
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    Applying...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Check className="h-4 w-4" />
+                                                                    Apply
+                                                                </>
+                                                            )}
                                                         </button>
                                                     </div>
                                                 );
